@@ -1,0 +1,32 @@
+{
+  "name": "geo-publish",
+  "version": "1.0.0",
+  "description": "CLI tool to publish spreadsheet data to Geo protocol",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "geo-publish": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@geoprotocol/geo-sdk": "latest",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "viem": "^2.21.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
