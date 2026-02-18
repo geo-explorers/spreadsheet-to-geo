@@ -111,11 +111,11 @@ export function generatePublishReport(
     }
   }
 
-  // Populate entities
-  for (const [name, entity] of entityMap.entities) {
+  // Populate entities — only include created entities that actually got ops (have types)
+  for (const entity of entityMap.entities.values()) {
     if (entity.action === 'LINK') {
       report.details.entitiesLinked.push({ name: entity.name, id: entity.id });
-    } else {
+    } else if (entity.typeIds.length > 0) {
       report.details.entitiesCreated.push({
         name: entity.name,
         id: entity.id,
@@ -234,64 +234,35 @@ export function printReportSummary(report: PublishReport): void {
 export function printPrePublishSummary(
   data: ParsedSpreadsheet,
   entityMap: EntityMap,
-  relations: RelationToCreate[]
+  batchSummary: BatchSummary
 ): void {
   logger.section('Pre-Publish Summary');
 
   logger.keyValue('Space ID', data.metadata.spaceId);
   logger.keyValue('Space Type', data.metadata.spaceType);
 
-  // Count actions from resolved maps
-  let typesCreate = 0,
-    typesLink = 0;
-  for (const resolved of entityMap.types.values()) {
-    if (resolved.action === 'CREATE') typesCreate++;
-    else typesLink++;
-  }
-
-  let propsCreate = 0,
-    propsLink = 0;
-  for (const resolved of entityMap.properties.values()) {
-    if (resolved.action === 'CREATE') propsCreate++;
-    else propsLink++;
-  }
-
-  let entitiesCreate = 0,
-    entitiesLink = 0;
-  for (const entity of entityMap.entities.values()) {
-    if (entity.action === 'CREATE') entitiesCreate++;
-    else entitiesLink++;
-  }
-
   console.log();
   logger.subsection('Actions to be taken');
 
+  // Use batchSummary counts — these reflect what will actually get ops, not what was planned
   logger.table(
     ['Category', 'Will Create', 'Will Link'],
     [
-      ['Types', String(typesCreate), String(typesLink)],
-      ['Properties', String(propsCreate), String(propsLink)],
-      ['Entities', String(entitiesCreate), String(entitiesLink)],
-      ['Relations', String(relations.length), '-'],
+      ['Types', String(batchSummary.typesCreated), String(batchSummary.typesLinked)],
+      ['Properties', String(batchSummary.propertiesCreated), String(batchSummary.propertiesLinked)],
+      ['Entities', String(batchSummary.entitiesCreated), String(batchSummary.entitiesLinked)],
+      ['Relations', String(batchSummary.relationsCreated), '-'],
     ]
   );
 
-  // Multi-type entities
-  const multiType = Array.from(entityMap.entities.values()).filter(
-    e => e.types.length > 1
+  // Entities that will actually be created (have types resolved — will get ops)
+  const toCreate = Array.from(entityMap.entities.values()).filter(
+    e => e.action === 'CREATE' && e.typeIds.length > 0
   );
 
-  if (multiType.length > 0) {
-    console.log();
-    logger.subsection('Multi-Type Entities');
-    for (const entity of multiType) {
-      logger.listItem(`${entity.name}: ${entity.types.join(', ')}`);
-    }
-  }
-
-  // Entities to create
-  const toCreate = Array.from(entityMap.entities.values()).filter(
-    e => e.action === 'CREATE'
+  // Entities skipped due to no types (referenced but not in spreadsheet and not found in Geo)
+  const skipped = Array.from(entityMap.entities.values()).filter(
+    e => e.action === 'CREATE' && e.typeIds.length === 0
   );
 
   if (toCreate.length > 0) {
@@ -302,6 +273,14 @@ export function printPrePublishSummary(
     }
     if (toCreate.length > 15) {
       logger.listItem(`... and ${toCreate.length - 15} more`);
+    }
+  }
+
+  if (skipped.length > 0) {
+    console.log();
+    logger.subsection(`Entities Skipped — no types (${skipped.length})`);
+    for (const entity of skipped) {
+      logger.listItem(`${entity.name} — not in any entity tab and not found in Geo`);
     }
   }
 

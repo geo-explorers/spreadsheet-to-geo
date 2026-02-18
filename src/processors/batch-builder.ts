@@ -22,7 +22,7 @@ import type {
   PropertyDefinition,
 } from '../config/schema.js';
 import type { RelationToCreate } from './relation-builder.js';
-import { normalizeEntityName, parseDate } from '../utils/cell-parsers.js';
+import { normalizeEntityName, parseDate, parseTime, parseDatetime } from '../utils/cell-parsers.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -199,11 +199,17 @@ function buildEntityOps(
     // Build property values using SDK types
     const values = buildPropertyValues(spreadsheetEntity.properties, entityMap);
 
+    // Case-insensitive description lookup — curator may write Description or description
+    const descriptionKey = Object.keys(spreadsheetEntity.properties).find(
+      k => k.toLowerCase() === 'description'
+    );
+    const description = descriptionKey ? spreadsheetEntity.properties[descriptionKey] : undefined;
+
     // Use SDK to create entity
     const { ops: entityOps } = Graph.createEntity({
       id: entity.id,
       name: spreadsheetEntity.name,
-      description: spreadsheetEntity.properties['Description'],
+      description,
       types: entity.typeIds,
       values,
     });
@@ -226,7 +232,8 @@ function buildEntityOps(
     }
 
     if (entity.action === 'LINK') {
-      // Already counted above or exists in Geo
+      // Relation target found in Geo — link it, no ops needed
+      summary.entitiesLinked++;
       continue;
     }
 
@@ -353,21 +360,21 @@ function convertToTypedValue(
     }
 
     case 'TIME': {
-      const timeVal = parseDate(value);
+      const timeVal = parseTime(value);
       if (!timeVal) return undefined;
       return { type: 'time', value: timeVal };
     }
 
     case 'DATETIME': {
-      const datetimeVal = parseDate(value);
+      const datetimeVal = parseDatetime(value);
       if (!datetimeVal) return undefined;
       return { type: 'datetime', value: datetimeVal };
     }
 
     case 'BOOLEAN': {
       const lower = value.toLowerCase();
-      if (['true', 'yes', '1'].includes(lower)) return { type: 'boolean', value: true };
-      if (['false', 'no', '0'].includes(lower)) return { type: 'boolean', value: false };
+      if (['true', 'yes', 'y', '1'].includes(lower)) return { type: 'boolean', value: true };
+      if (['false', 'no', 'n', '0'].includes(lower)) return { type: 'boolean', value: false };
       return undefined;
     }
 

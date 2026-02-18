@@ -155,6 +155,16 @@ export async function searchEntitiesByNames(
 
   logger.info(`Searching for ${names.length} entities in Geo...`);
 
+  // Only search target space if a real space ID is provided
+  const isValidTargetSpace =
+    !!targetSpaceId &&
+    targetSpaceId !== 'placeholder_space_id_for_dry_run' &&
+    /^[0-9a-f]{32}$/i.test(targetSpaceId);
+
+  if (!isValidTargetSpace) {
+    logger.debug('No valid target space ID — searching Root space only');
+  }
+
   // Search in batches to avoid overwhelming the API
   const batchSize = 20;
   let processed = 0;
@@ -162,20 +172,22 @@ export async function searchEntitiesByNames(
   for (let i = 0; i < names.length; i += batchSize) {
     const batch = names.slice(i, i + batchSize);
 
-    // Search each name in both Root space and target space
-    const searchPromises = batch.flatMap(name => [
-      searchEntityByName(name, ROOT_SPACE_ID, network),
-      searchEntityByName(name, targetSpaceId, network),
-    ]);
+    // Always search Root space; only search target space if ID is valid
+    const searchPromises = batch.flatMap(name =>
+      isValidTargetSpace
+        ? [searchEntityByName(name, ROOT_SPACE_ID, network), searchEntityByName(name, targetSpaceId, network)]
+        : [searchEntityByName(name, ROOT_SPACE_ID, network)]
+    );
 
     const searchResults = await Promise.all(searchPromises);
 
     // Process results - prefer target space match over Root space
+    const stride = isValidTargetSpace ? 2 : 1;
     for (let j = 0; j < batch.length; j++) {
       const name = batch[j];
       const normalized = normalizeEntityName(name);
-      const rootResult = searchResults[j * 2];
-      const targetResult = searchResults[j * 2 + 1];
+      const rootResult = searchResults[j * stride];
+      const targetResult = isValidTargetSpace ? searchResults[j * stride + 1] : null;
 
       // Prefer target space result, fall back to root space
       const result = targetResult || rootResult;

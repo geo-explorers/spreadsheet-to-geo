@@ -32,6 +32,9 @@ export function validateSpreadsheet(data: ParsedSpreadsheet): ValidationResult {
   // Validate entities
   validateEntities(data, errors);
 
+  // Validate entity columns against Properties tab
+  validateEntityColumns(data, errors);
+
   // Validate reference integrity
   validateReferenceIntegrity(data, errors);
 
@@ -231,6 +234,39 @@ function validateEntities(data: ParsedSpreadsheet, errors: ValidationError[]): v
   }
 }
 
+function validateEntityColumns(data: ParsedSpreadsheet, errors: ValidationError[]): void {
+  // Build set of known property names from Properties tab
+  const knownProperties = new Set<string>();
+  for (const prop of data.properties) {
+    knownProperties.add(normalizeEntityName(prop.name));
+  }
+
+  // Warn once per (tab, column) pair — not once per entity row
+  const warned = new Set<string>();
+
+  for (const entity of data.entities) {
+    for (const colName of Object.keys(entity.properties)) {
+      const normalized = normalizeEntityName(colName);
+
+      // Skip description — handled separately by batch-builder
+      if (normalized === 'description') continue;
+
+      if (!knownProperties.has(normalized)) {
+        const warnKey = `${entity.sourceTab}:${colName}`;
+        if (!warned.has(warnKey)) {
+          warned.add(warnKey);
+          errors.push({
+            tab: entity.sourceTab,
+            column: colName,
+            message: `Column "${colName}" is not declared in the Properties tab — add it to the Properties tab or remove it before publishing`,
+            severity: 'error',
+          });
+        }
+      }
+    }
+  }
+}
+
 function validateReferenceIntegrity(data: ParsedSpreadsheet, errors: ValidationError[]): void {
   // Build set of all known entity names (from all entity tabs)
   const knownEntities = new Set<string>();
@@ -238,10 +274,14 @@ function validateReferenceIntegrity(data: ParsedSpreadsheet, errors: ValidationE
     knownEntities.add(normalizeEntityName(entity.name));
   }
 
-  // Build set of known types
+  // Build set of known types — includes Types tab rows AND entity tab names
+  // (per IDEA.md: "tab name becomes the default type")
   const knownTypes = new Set<string>();
   for (const type of data.types) {
     knownTypes.add(normalizeEntityName(type.name));
+  }
+  for (const entity of data.entities) {
+    knownTypes.add(normalizeEntityName(entity.sourceTab));
   }
 
   // Check entity types reference known types
@@ -258,18 +298,34 @@ function validateReferenceIntegrity(data: ParsedSpreadsheet, errors: ValidationE
     }
   }
 
+  // Build property → pointsToTypes lookup for actionable warning messages
+  const propertyPointsTo = new Map<string, string>();
+  for (const prop of data.properties) {
+    if (prop.dataType === 'RELATION' && prop.pointsToTypes) {
+      propertyPointsTo.set(normalizeEntityName(prop.name), prop.pointsToTypes);
+    }
+  }
+
   // Check relation values reference known entities
-  // Note: This is now a warning since entities might exist in Geo already
+  // Deduplicate per (tab, column, targetName) — same target referenced by many rows fires once
+  const warnedRefs = new Set<string>();
+
   for (const entity of data.entities) {
     for (const [propName, targetNames] of Object.entries(entity.relations)) {
+      const expectedTypes = propertyPointsTo.get(normalizeEntityName(propName));
+      const typeHint = expectedTypes ? ` (expects: ${expectedTypes})` : '';
       for (const targetName of targetNames) {
         if (!knownEntities.has(normalizeEntityName(targetName))) {
-          errors.push({
-            tab: entity.sourceTab,
-            column: propName,
-            message: `Entity "${entity.name}" references "${targetName}" via ${propName} - ensure this entity exists in Geo or add it to a tab`,
-            severity: 'warning',
-          });
+          const refKey = `${entity.sourceTab}:${propName}:${normalizeEntityName(targetName)}`;
+          if (!warnedRefs.has(refKey)) {
+            warnedRefs.add(refKey);
+            errors.push({
+              tab: entity.sourceTab,
+              column: propName,
+              message: `"${targetName}"${typeHint} not found in spreadsheet — ensure it exists in Geo or add it to an entity tab`,
+              severity: 'warning',
+            });
+          }
         }
       }
     }

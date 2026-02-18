@@ -121,7 +121,7 @@ async function main(file: string, options: {
     console.log(formatBatchSummary(batch.summary));
 
     // Print pre-publish summary
-    printPrePublishSummary(data, entityMap, relations);
+    printPrePublishSummary(data, entityMap, batch.summary);
 
     // If dry run, stop here
     if (options.dryRun) {

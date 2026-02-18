@@ -120,6 +120,10 @@ async function publishToPersonalSpace(
 ): Promise<Omit<PublishResult, 'summary'>> {
   logger.info('Publishing to personal space...');
 
+  // Use curator's personal space ID as author when provided, otherwise fall back to wallet
+  const author = metadata.author || walletAddress;
+  logger.keyValue('Author', metadata.author ? `${author} (from Metadata tab)` : `${author} (wallet — no author in Metadata)`);
+
   // Check if space exists, create if needed
   const hasSpace = await personalSpace.hasSpace({
     address: walletAddress as `0x${string}`,
@@ -141,7 +145,7 @@ async function publishToPersonalSpace(
     name: `Spreadsheet import - ${new Date().toISOString()}`,
     spaceId: metadata.spaceId,
     ops,
-    author: walletAddress as `0x${string}`,
+    author,
     network: options.network as Network,
   });
 
@@ -194,6 +198,10 @@ async function publishToDAOSpace(
 ): Promise<Omit<PublishResult, 'summary'>> {
   logger.info('Publishing to DAO space (creating proposal)...');
 
+  // Use curator's personal space ID as author when provided, otherwise fall back to wallet
+  const author = metadata.author || walletAddress;
+  logger.keyValue('Author', metadata.author ? `${author} (from Metadata tab)` : `${author} (wallet — no author in Metadata)`);
+
   // DAO space publishing requires additional configuration
   const daoSpaceAddress = process.env.DAO_SPACE_ADDRESS as `0x${string}` | undefined;
   const callerSpaceId = process.env.CALLER_SPACE_ID as `0x${string}` | undefined;
@@ -210,7 +218,7 @@ async function publishToDAOSpace(
     const { cid, editId, to, calldata } = await daoSpace.proposeEdit({
       name: `Spreadsheet import - ${new Date().toISOString()}`,
       ops,
-      author: walletAddress as `0x${string}`,
+      author,
       daoSpaceAddress,
       callerSpaceId,
       daoSpaceId: metadata.spaceId as `0x${string}`,

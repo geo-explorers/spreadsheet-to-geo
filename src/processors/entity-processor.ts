@@ -259,6 +259,7 @@ async function processEntities(
   }
 
   // Also add relation targets that aren't main entities
+  // Per IDEA.md: types come from entity tabs only — relation targets with no tab have no types
   for (const entity of entities) {
     for (const targets of Object.values(entity.relations)) {
       for (const target of targets) {
@@ -267,8 +268,8 @@ async function processEntities(
           const existing = existingEntities.get(normalized);
           byName.set(normalized, {
             name: target,
-            types: new Set(), // Type unknown - will need to be resolved from existing or inferred
-            sourceTab: '', // Not from a specific tab
+            types: new Set(),
+            sourceTab: '',
             existing,
           });
         }

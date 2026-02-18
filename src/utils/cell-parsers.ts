@@ -150,6 +150,88 @@ export function parseDate(value: string | number | Date | undefined | null): str
 }
 
 /**
+ * Parse time value to ISO 8601 time format with UTC timezone (HH:MM:SSZ)
+ * Handles: "14:30:00", "14:30", "2:30 PM", Excel time serials (fraction of day)
+ */
+export function parseTime(value: string | number | Date | undefined | null): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+
+  let hours: number;
+  let minutes: number;
+  let seconds: number;
+
+  if (typeof value === 'number') {
+    // Excel time serial: fraction of day (0.5 = noon = 12:00:00)
+    const totalSeconds = Math.round(value * 86400);
+    hours = Math.floor(totalSeconds / 3600);
+    minutes = Math.floor((totalSeconds % 3600) / 60);
+    seconds = totalSeconds % 60;
+  } else {
+    let date: Date;
+
+    if (value instanceof Date) {
+      date = value;
+    } else {
+      const trimmed = value.trim();
+      if (!trimmed) return undefined;
+
+      // Try pure time format: HH:MM or HH:MM:SS (optionally with AM/PM)
+      const timeMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(AM|PM))?$/i);
+      if (timeMatch) {
+        hours = parseInt(timeMatch[1]);
+        minutes = parseInt(timeMatch[2]);
+        seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
+        const meridiem = timeMatch[4]?.toUpperCase();
+        if (meridiem === 'PM' && hours < 12) hours += 12;
+        if (meridiem === 'AM' && hours === 12) hours = 0;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}Z`;
+      }
+
+      // Fall back to full date parse and extract time component
+      date = new Date(trimmed);
+      if (isNaN(date.getTime())) return undefined;
+    }
+
+    hours = date.getHours();
+    minutes = date.getMinutes();
+    seconds = date.getSeconds();
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}Z`;
+}
+
+/**
+ * Parse datetime value to ISO 8601 combined format (YYYY-MM-DDTHH:MM:SSZ)
+ * Handles: "2024-01-15T14:30:00", "2024-01-15 14:30:00", Excel datetime serials
+ */
+export function parseDatetime(value: string | number | Date | undefined | null): string | undefined {
+  if (!value) return undefined;
+
+  let date: Date;
+
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === 'number') {
+    // Excel datetime serial: integer part = date, fractional part = time
+    date = excelSerialToDate(value);
+  } else {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    date = new Date(trimmed);
+    if (isNaN(date.getTime())) return undefined;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`;
+}
+
+/**
  * Convert Excel serial date to JavaScript Date
  * Excel dates start from 1900-01-01 (serial = 1)
  */
