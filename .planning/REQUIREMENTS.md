@@ -1,0 +1,128 @@
+# Requirements: Geo Bulk Operations Tool
+
+**Defined:** 2026-02-19
+**Core Value:** Editors can fix data quality issues at scale through standardized spreadsheet-driven bulk operations
+
+## v1 Requirements
+
+Requirements for initial release. Each maps to roadmap phases.
+
+### Restructuring
+
+- [ ] **STRUC-01**: Extract monolithic `src/index.ts` into thin CLI router + per-operation command handlers in `src/commands/`
+- [ ] **STRUC-02**: Move existing upsert pipeline into `src/commands/upsert.ts` without changing behavior
+- [ ] **STRUC-03**: Shared infrastructure (API client, publisher, logger, cell parsers) remains in common modules
+- [ ] **STRUC-04**: Operation-specific logic (validators, batch builders) isolated per operation in dedicated files
+- [ ] **STRUC-05**: Type definitions split into shared types + operation-specific types
+
+### CLI Infrastructure
+
+- [ ] **CLI-01**: CLI uses subcommand structure (`geo-publish upsert|delete|update`)
+- [ ] **CLI-02**: CSV parser handles single-column (delete) and multi-column (future merge) inputs
+- [ ] **CLI-03**: Generalized report type covers all operation types
+
+### Shared Infrastructure
+
+- [ ] **INFRA-01**: GraphQL client can fetch entity details by ID (properties, relation IDs, type assignments)
+- [ ] **INFRA-02**: GraphQL client can fetch incoming relations (backlinks) for an entity
+- [ ] **INFRA-03**: Entity ID validation rejects malformed IDs before API calls
+
+### Delete Operation
+
+- [ ] **DEL-01**: User can provide CSV of entity IDs as delete input
+- [ ] **DEL-02**: Tool validates all entity IDs exist before executing any deletions
+- [ ] **DEL-03**: Tool deletes all property triples for each entity
+- [ ] **DEL-04**: Tool deletes all outgoing relations for each entity
+- [ ] **DEL-05**: Tool deletes all incoming relations (backlinks) for each entity
+- [ ] **DEL-06**: Tool deletes type assignment relations for each entity
+- [ ] **DEL-07**: Tool deletes the entity itself after all triples are removed
+- [ ] **DEL-08**: Dry-run mode shows entity names, property counts, and relation counts without executing
+- [ ] **DEL-09**: Pre-operation snapshot saves entity data before deletion as audit trail
+- [ ] **DEL-10**: Progress reporting shows "Processing X/Y..." for batches
+- [ ] **DEL-11**: Summary report shows counts of entities deleted, relations removed, properties unset
+
+### Update Operation
+
+- [ ] **UPD-01**: User can provide Excel spreadsheet in same format as upsert, plus entity ID column
+- [ ] **UPD-02**: Tool validates all entity IDs exist before executing updates
+- [ ] **UPD-03**: Tool overwrites existing property values using `updateEntity` set semantics
+- [ ] **UPD-04**: Tool unsets properties for explicitly cleared/empty cells
+- [ ] **UPD-05**: Dry-run mode shows what properties will be changed per entity
+- [ ] **UPD-06**: Summary report shows counts of entities updated, properties set, properties unset
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Merge Operation
+
+- **MERGE-01**: User can provide CSV with keeper_id/merger_id pairs as merge input
+- **MERGE-02**: Tool validates both keeper and merger entities exist
+- **MERGE-03**: Tool copies properties from merger to keeper without overwriting keeper's existing values
+- **MERGE-04**: Tool re-points relations from merger to keeper
+- **MERGE-05**: Tool deletes merger entity after transfer (using delete logic)
+- **MERGE-06**: All ops for a merge pair published in single atomic transaction
+- **MERGE-07**: Dry-run mode shows property transfers, relation re-points, and conflicts
+- **MERGE-08**: Merge conflict detection logs when keeper already has a value merger also has
+- **MERGE-09**: Summary report shows properties transferred, relations re-pointed, mergers deleted
+
+### Enhancements
+
+- **ENH-01**: Batch transaction splitting for operations exceeding transaction size limits
+- **ENH-02**: Idempotent re-runs with checkpoint files for partially failed batches
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Backward compatibility (`geo-publish <file>` without subcommand) | Clean break to subcommand-based CLI; users adopt new syntax |
+| Cascade delete (delete entity + everything it relates to) | Unbounded in knowledge graphs — could delete half the graph through chains |
+| Update/delete by entity name | Names are not unique identifiers in Geo; ambiguity = data corruption |
+| Undo/rollback command | Blockchain transactions are irreversible |
+| Cross-space operations | Violates space governance model |
+| Editor-facing UI or web interface | Engineers run CLI on editors' behalf |
+| Auto-detect merge candidates | Complex NLP/heuristic problem; separate tool |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| STRUC-01 | — | Pending |
+| STRUC-02 | — | Pending |
+| STRUC-03 | — | Pending |
+| STRUC-04 | — | Pending |
+| STRUC-05 | — | Pending |
+| CLI-01 | — | Pending |
+| CLI-02 | — | Pending |
+| CLI-03 | — | Pending |
+| INFRA-01 | — | Pending |
+| INFRA-02 | — | Pending |
+| INFRA-03 | — | Pending |
+| DEL-01 | — | Pending |
+| DEL-02 | — | Pending |
+| DEL-03 | — | Pending |
+| DEL-04 | — | Pending |
+| DEL-05 | — | Pending |
+| DEL-06 | — | Pending |
+| DEL-07 | — | Pending |
+| DEL-08 | — | Pending |
+| DEL-09 | — | Pending |
+| DEL-10 | — | Pending |
+| DEL-11 | — | Pending |
+| UPD-01 | — | Pending |
+| UPD-02 | — | Pending |
+| UPD-03 | — | Pending |
+| UPD-04 | — | Pending |
+| UPD-05 | — | Pending |
+| UPD-06 | — | Pending |
+
+**Coverage:**
+- v1 requirements: 28 total
+- Mapped to phases: 0
+- Unmapped: 28 ⚠️
+
+---
+*Requirements defined: 2026-02-19*
+*Last updated: 2026-02-19 after initial definition*
