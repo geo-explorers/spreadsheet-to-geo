@@ -1,9 +1,6 @@
 [submodule "submodules/hypergraph"]
 	path = submodules/hypergraph
 	url = git@github.com:geo-explorers/hypergraph.git
-[submodule "submodules/grc-20-ts"]
-	path = submodules/grc-20-ts
-	url = git@github.com:geobrowser/grc-20.git
 [submodule "submodules/geo-sdk"]
 	path = submodules/geo-sdk
 	url = git@github.com:geobrowser/geo-sdk.git
