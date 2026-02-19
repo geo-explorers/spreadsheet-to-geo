@@ -4,7 +4,7 @@
 
 ## Tech Debt
 
-**Incomplete API integration for properties:**
+**Incomplete API integration for properties:** 💡💡💡💡💡💡💡
 - Issue: `searchPropertiesByNames()` in `src/api/geo-client.ts` (lines 247-278) treats properties as entities and returns placeholder values for `dataTypeId` and `dataTypeName` (both empty strings)
 - Files: `src/api/geo-client.ts:267-270`
 - Impact: Property metadata (data type information) is not populated from API. Properties are still created correctly, but API doesn't provide the full property definition for already-created properties
@@ -22,9 +22,9 @@
 - Impact: Users attempting DAO space publishing without these variables get an error but no documentation on where to find them
 - Fix approach: Add documentation link or more detailed error message explaining what these values represent and where to source them
 
-## Known Limitations (by Design)
+## Known Limitations (by Design) 
 
-**Cannot modify linked entities:**
+**Cannot modify linked entities:** 💡💡💡💡💡💡💡
 - Issue: Relations can only be created for entities with `action='CREATE'`. Entities with `action='LINK'` (existing in Geo) skip relation building
 - Files: `src/processors/relation-builder.ts:54-58`
 - Impact: If a curator wants to add relations to an entity that already exists in Geo, those relations will be silently skipped
@@ -80,19 +80,19 @@
 
 ## Missing Protections
 
-**No dedupe within a single entity tab:**
+**No dedupe within a single entity tab:** 💡💡💡💡💡💡💡
 - Issue: Validator doesn't catch duplicate entity names in the same entity tab (only warns if across tabs)
 - Files: `src/parsers/validators.ts:214-230` — only errors on duplicates in same tab by accident, inconsistently
 - Risk: If a tab has the same entity twice, both rows will be processed, and batch-builder will skip the second by deduplication map
 - Recommendation: Validator should error explicitly on duplicate names within same tab; let user fix it
 
-**No validation that relation targets will be found:**
+**No validation that relation targets will be found:** 💡💡💡💡💡💡💡
 - Issue: Validator warns if relation target is not in spreadsheet, but doesn't verify it exists in Geo (dry-run only checks via warning)
 - Files: `src/parsers/validators.ts:318-330`
 - Risk: Relation will be created to a non-existent entity ID if target is not in spreadsheet AND not in Geo, causing silent failures
 - Recommendation: During `buildEntityMap()`, log entity creation for relation targets with no types; explicitly mark them as "will fail if not in Geo"
 
-**No size limits on operations batch:**
+**No size limits on operations batch:** 
 - Issue: No validation that the total operations count won't exceed SDK or blockchain limits
 - Files: `src/processors/batch-builder.ts` generates ops but doesn't validate total count
 - Risk: Spreadsheet with thousands of entities could generate a batch too large to submit
