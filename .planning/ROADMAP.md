@@ -28,12 +28,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Running `geo-publish delete` or `geo-publish update` without arguments shows command-specific help (not an error)
   4. Entity detail query returns properties, relation IDs, type assignments, and backlinks for a known entity ID
   5. CSV parser correctly reads a single-column file of entity IDs and rejects malformed IDs
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- CLI restructure and upsert extraction (wave 1)
+- [ ] 01-02-PLAN.md -- Type splitting and generalized reports (wave 2, depends on 01-01)
+- [ ] 01-03-PLAN.md -- Entity detail queries and entity ID parser (wave 1)
 
 ### Phase 2: Bulk Delete
 **Goal**: Engineers can bulk-delete entities from a CSV of entity IDs, with all associated triples (properties, outgoing relations, incoming relations, type assignments) removed before entity deletion
@@ -75,6 +75,6 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. CLI Restructure and Shared Infrastructure | 0/3 | Not started | - |
+| 1. CLI Restructure and Shared Infrastructure | 0/3 | Planned | - |
 | 2. Bulk Delete | 0/3 | Not started | - |
 | 3. Bulk Update | 0/2 | Not started | - |
