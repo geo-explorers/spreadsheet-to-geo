@@ -18,14 +18,14 @@ Requirements for initial release. Each maps to roadmap phases.
 ### CLI Infrastructure
 
 - [ ] **CLI-01**: CLI uses subcommand structure (`geo-publish upsert|delete|update`)
-- [ ] **CLI-02**: CSV parser handles single-column (delete) and multi-column (future merge) inputs
+- [x] **CLI-02**: CSV parser handles single-column (delete) and multi-column (future merge) inputs
 - [ ] **CLI-03**: Generalized report type covers all operation types
 
 ### Shared Infrastructure
 
-- [ ] **INFRA-01**: GraphQL client can fetch entity details by ID (properties, relation IDs, type assignments)
-- [ ] **INFRA-02**: GraphQL client can fetch incoming relations (backlinks) for an entity
-- [ ] **INFRA-03**: Entity ID validation rejects malformed IDs before API calls
+- [x] **INFRA-01**: GraphQL client can fetch entity details by ID (properties, relation IDs, type assignments)
+- [x] **INFRA-02**: GraphQL client can fetch incoming relations (backlinks) for an entity
+- [x] **INFRA-03**: Entity ID validation rejects malformed IDs before API calls
 
 ### Delete Operation
 
@@ -95,11 +95,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STRUC-04 | Phase 1 | Pending |
 | STRUC-05 | Phase 1 | Pending |
 | CLI-01 | Phase 1 | Pending |
-| CLI-02 | Phase 1 | Pending |
+| CLI-02 | Phase 1 | Complete |
 | CLI-03 | Phase 1 | Pending |
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
-| INFRA-03 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
+| INFRA-03 | Phase 1 | Complete |
 | DEL-01 | Phase 2 | Pending |
 | DEL-02 | Phase 2 | Pending |
 | DEL-03 | Phase 2 | Pending |
