@@ -17,10 +17,10 @@ import { buildOperationsBatch, formatBatchSummary } from '../processors/batch-bu
 import { publishToGeo, validatePrivateKey } from '../publishers/publisher.js';
 import {
   generatePublishReport,
-  saveReport,
   printReportSummary,
   printPrePublishSummary,
 } from '../publishers/publish-report.js';
+import { saveOperationReport } from '../publishers/report.js';
 import { logger, setVerbose } from '../utils/logger.js';
 import type { PublishOptions } from '../config/types.js';
 
@@ -149,9 +149,9 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
         success: true,
         summary: batch.summary,
       };
-      const report = generatePublishReport(data, entityMap, relations, result, network);
+      const report = generatePublishReport(data, entityMap, relations, result, network, true);
       report.transactionHash = '(dry-run)';
-      const reportPath = saveReport(report, options.output);
+      const reportPath = saveOperationReport(report, options.output);
 
       process.exit(0);
     }
@@ -192,8 +192,8 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
     const result = await publishToGeo(batch, data.metadata, privateKey, publishOptions);
 
     // Generate and save report
-    const report = generatePublishReport(data, entityMap, relations, result, network);
-    const reportPath = saveReport(report, options.output);
+    const report = generatePublishReport(data, entityMap, relations, result, network, false);
+    const reportPath = saveOperationReport(report, options.output);
 
     // Print final summary
     printReportSummary(report);
