@@ -9,15 +9,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Restructuring
 
-- [ ] **STRUC-01**: Extract monolithic `src/index.ts` into thin CLI router + per-operation command handlers in `src/commands/`
-- [ ] **STRUC-02**: Move existing upsert pipeline into `src/commands/upsert.ts` without changing behavior
-- [ ] **STRUC-03**: Shared infrastructure (API client, publisher, logger, cell parsers) remains in common modules
-- [ ] **STRUC-04**: Operation-specific logic (validators, batch builders) isolated per operation in dedicated files
+- [x] **STRUC-01**: Extract monolithic `src/index.ts` into thin CLI router + per-operation command handlers in `src/commands/`
+- [x] **STRUC-02**: Move existing upsert pipeline into `src/commands/upsert.ts` without changing behavior
+- [x] **STRUC-03**: Shared infrastructure (API client, publisher, logger, cell parsers) remains in common modules
+- [x] **STRUC-04**: Operation-specific logic (validators, batch builders) isolated per operation in dedicated files
 - [ ] **STRUC-05**: Type definitions split into shared types + operation-specific types
 
 ### CLI Infrastructure
 
-- [ ] **CLI-01**: CLI uses subcommand structure (`geo-publish upsert|delete|update`)
+- [x] **CLI-01**: CLI uses subcommand structure (`geo-publish upsert|delete|update`)
 - [x] **CLI-02**: CSV parser handles single-column (delete) and multi-column (future merge) inputs
 - [ ] **CLI-03**: Generalized report type covers all operation types
 
@@ -89,12 +89,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STRUC-01 | Phase 1 | Pending |
-| STRUC-02 | Phase 1 | Pending |
-| STRUC-03 | Phase 1 | Pending |
-| STRUC-04 | Phase 1 | Pending |
+| STRUC-01 | Phase 1 | Complete |
+| STRUC-02 | Phase 1 | Complete |
+| STRUC-03 | Phase 1 | Complete |
+| STRUC-04 | Phase 1 | Complete |
 | STRUC-05 | Phase 1 | Pending |
-| CLI-01 | Phase 1 | Pending |
+| CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 1 | Complete |
 | CLI-03 | Phase 1 | Pending |
 | INFRA-01 | Phase 1 | Complete |
