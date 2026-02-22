@@ -44,6 +44,35 @@ export interface GeoProperty {
 }
 
 /**
+ * Full entity details returned from entity detail queries
+ * Includes properties, relations (with their own IDs for deletion), and backlinks
+ */
+export interface EntityDetails {
+  id: string;
+  name: string | null;
+  typeIds: string[];
+  values: Array<{
+    propertyId: string;
+    text: string | null;
+    boolean: boolean | null;
+    float: number | null;
+    datetime: string | null;
+    point: string | null;
+    schedule: string | null;
+  }>;
+  relations: Array<{
+    id: string;        // Relation's own ID -- needed for deleteRelation()
+    typeId: string;
+    toEntity: { id: string; name: string | null };
+  }>;
+  backlinks: Array<{
+    id: string;        // Backlink relation's own ID -- needed for deleteRelation()
+    typeId: string;
+    fromEntity: { id: string; name: string | null };
+  }>;
+}
+
+/**
  * GraphQL query for entity search
  */
 const SEARCH_QUERY = `
@@ -72,6 +101,51 @@ const ENTITIES_QUERY = `
       types {
         id
         name
+      }
+    }
+  }
+`;
+
+/**
+ * GraphQL query for fetching full entity details
+ * Uses `relations` connection (NOT `relationsList`) to get the relation row's own ID,
+ * which is required for Graph.deleteRelation({ id }).
+ * Same pattern for `backlinks` connection.
+ */
+const ENTITY_DETAILS_QUERY = `
+  query EntityDetails($id: UUID!, $spaceId: UUID!) {
+    entity(id: $id) {
+      id
+      name
+      typeIds
+      valuesList(filter: { spaceId: { is: $spaceId } }) {
+        propertyId
+        text
+        boolean
+        float
+        datetime
+        point
+        schedule
+      }
+      relations(filter: { spaceId: { is: $spaceId } }) {
+        nodes {
+          id
+          typeId
+          toEntity {
+            id
+            name
+          }
+        }
+      }
+      backlinks(filter: { spaceId: { is: $spaceId } }) {
+        nodes {
+          id
+          typeId
+          fromEntity {
+            id
+            name
+          }
+        }
       }
     }
   }
@@ -293,5 +367,45 @@ export async function testApiConnection(network: 'TESTNET' | 'MAINNET'): Promise
       error: error instanceof Error ? error.message : String(error),
     });
     return false;
+  }
+}
+
+/**
+ * Fetch full details for an entity by ID
+ * Returns properties, outgoing relations (with their own IDs), incoming relations (backlinks),
+ * type assignments, and name. Returns null for non-existent entities.
+ */
+export async function fetchEntityDetails(
+  entityId: string,
+  spaceId: string,
+  network: 'TESTNET' | 'MAINNET'
+): Promise<EntityDetails | null> {
+  try {
+    const data = await executeQuery<{
+      entity: {
+        id: string;
+        name: string | null;
+        typeIds: string[];
+        valuesList: EntityDetails['values'];
+        relations: { nodes: EntityDetails['relations'] };
+        backlinks: { nodes: EntityDetails['backlinks'] };
+      } | null;
+    }>(ENTITY_DETAILS_QUERY, { id: entityId, spaceId }, network);
+
+    if (!data.entity) return null;
+
+    return {
+      id: data.entity.id,
+      name: data.entity.name,
+      typeIds: data.entity.typeIds,
+      values: data.entity.valuesList,
+      relations: data.entity.relations.nodes,
+      backlinks: data.entity.backlinks.nodes,
+    };
+  } catch (error) {
+    logger.warn(`Failed to fetch entity details for "${entityId}"`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
