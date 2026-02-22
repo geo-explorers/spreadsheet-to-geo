@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 1 of 3 (CLI Restructure and Shared Infrastructure)
-Plan: 3 of 3 in current phase
-Status: Executing
-Last activity: 2026-02-22 -- Completed 01-03-PLAN.md (entity detail queries and ID parser)
+Plan: 3 of 3 in current phase (all complete)
+Status: Phase 1 Complete
+Last activity: 2026-02-22 -- Completed 01-02-PLAN.md (shared types and report infrastructure)
 
 Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 2.5min
-- Total execution time: 0.08 hours
+- Total plans completed: 3
+- Average duration: 2.7min
+- Total execution time: 0.13 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01 | 2 | 5min | 2.5min |
+| 01 | 3 | 8min | 2.7min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (2min), 01-01 (3min)
-- Trend: -
+- Last 5 plans: 01-02 (3min), 01-03 (2min), 01-01 (3min)
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -46,6 +46,8 @@ Recent decisions affecting current work:
 - Roadmap: Phases 2 and 3 are independent after Phase 1 (parallelizable).
 - 01-03: Used relations connection pattern (not relationsList) to expose relation row IDs needed for deleteRelation()
 - 01-03: Entity ID parser accumulates all errors rather than failing on first -- caller decides rejection policy
+- 01-02: PublishResult and BatchSummary kept in upsert-types.ts to avoid shared-to-upsert dependency
+- 01-02: Report naming convention: {operation}-{timestamp}.json with optional -dryrun suffix
 - [Phase 01]: CLI router uses dynamic import for command handlers to keep startup fast
 - [Phase 01]: Network resolution precedence: --network flag > GEO_NETWORK env var > TESTNET default
 
@@ -61,5 +63,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 01-01-PLAN.md (CLI restructure and upsert extraction)
-Resume file: .planning/phases/01-cli-restructure-and-shared-infrastructure/01-01-SUMMARY.md
+Stopped at: Completed 01-02-PLAN.md (shared types and report infrastructure) -- Phase 1 complete
+Resume file: .planning/phases/01-cli-restructure-and-shared-infrastructure/01-02-SUMMARY.md

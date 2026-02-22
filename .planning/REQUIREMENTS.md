@@ -13,13 +13,13 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **STRUC-02**: Move existing upsert pipeline into `src/commands/upsert.ts` without changing behavior
 - [x] **STRUC-03**: Shared infrastructure (API client, publisher, logger, cell parsers) remains in common modules
 - [x] **STRUC-04**: Operation-specific logic (validators, batch builders) isolated per operation in dedicated files
-- [ ] **STRUC-05**: Type definitions split into shared types + operation-specific types
+- [x] **STRUC-05**: Type definitions split into shared types + operation-specific types
 
 ### CLI Infrastructure
 
 - [x] **CLI-01**: CLI uses subcommand structure (`geo-publish upsert|delete|update`)
 - [x] **CLI-02**: CSV parser handles single-column (delete) and multi-column (future merge) inputs
-- [ ] **CLI-03**: Generalized report type covers all operation types
+- [x] **CLI-03**: Generalized report type covers all operation types
 
 ### Shared Infrastructure
 
@@ -93,10 +93,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STRUC-02 | Phase 1 | Complete |
 | STRUC-03 | Phase 1 | Complete |
 | STRUC-04 | Phase 1 | Complete |
-| STRUC-05 | Phase 1 | Pending |
+| STRUC-05 | Phase 1 | Complete |
 | CLI-01 | Phase 1 | Complete |
 | CLI-02 | Phase 1 | Complete |
-| CLI-03 | Phase 1 | Pending |
+| CLI-03 | Phase 1 | Complete |
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 1 | Complete |
