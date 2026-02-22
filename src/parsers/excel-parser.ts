@@ -8,15 +8,14 @@
  */
 
 import XLSX from 'xlsx';
-import {
-  type ParsedSpreadsheet,
-  type Metadata,
-  type TypeDefinition,
-  type PropertyDefinition,
-  type SpreadsheetEntity,
-  SPECIAL_TABS,
-  REQUIRED_TABS,
-} from '../config/schema.js';
+import { SPECIAL_TABS, REQUIRED_TABS } from '../config/types.js';
+import type {
+  ParsedSpreadsheet,
+  TypeDefinition,
+  PropertyDefinition,
+  SpreadsheetEntity,
+} from '../config/upsert-types.js';
+import type { Metadata } from '../config/types.js';
 import {
   parseSemicolonList,
   parseMultiValueList,

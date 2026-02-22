@@ -20,7 +20,7 @@ import type {
   OperationsBatch,
   BatchSummary,
   PropertyDefinition,
-} from '../config/schema.js';
+} from '../config/upsert-types.js';
 import type { RelationToCreate } from './relation-builder.js';
 import { normalizeEntityName, parseDate, parseTime, parseDatetime } from '../utils/cell-parsers.js';
 import { logger } from '../utils/logger.js';

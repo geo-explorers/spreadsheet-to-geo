@@ -15,7 +15,7 @@ import type {
   ResolvedProperty,
   PropertyDefinition,
   TypeDefinition,
-} from '../config/schema.js';
+} from '../config/upsert-types.js';
 import { normalizeEntityName, generateGeoId } from '../utils/cell-parsers.js';
 import { logger } from '../utils/logger.js';
 import {

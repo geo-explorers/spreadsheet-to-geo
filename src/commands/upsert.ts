@@ -22,7 +22,7 @@ import {
   printPrePublishSummary,
 } from '../publishers/publish-report.js';
 import { logger, setVerbose } from '../utils/logger.js';
-import type { PublishOptions } from '../config/schema.js';
+import type { PublishOptions } from '../config/types.js';
 
 interface UpsertOptions {
   network?: string;

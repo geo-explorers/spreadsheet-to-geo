@@ -6,11 +6,8 @@
  * - No "Geo ID" column validation (use API search for deduplication)
  */
 
-import type {
-  ParsedSpreadsheet,
-  ValidationResult,
-  ValidationError,
-} from '../config/schema.js';
+import type { ValidationResult, ValidationError } from '../config/types.js';
+import type { ParsedSpreadsheet } from '../config/upsert-types.js';
 import { normalizeEntityName } from '../utils/cell-parsers.js';
 import { logger } from '../utils/logger.js';
 

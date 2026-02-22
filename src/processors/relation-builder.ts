@@ -9,7 +9,7 @@
 import type {
   ParsedSpreadsheet,
   EntityMap,
-} from '../config/schema.js';
+} from '../config/upsert-types.js';
 import {
   resolveEntityId,
   resolvePropertyId,

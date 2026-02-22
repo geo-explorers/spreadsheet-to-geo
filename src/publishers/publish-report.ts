@@ -13,7 +13,7 @@ import type {
   EntityMap,
   PublishResult,
   BatchSummary,
-} from '../config/schema.js';
+} from '../config/upsert-types.js';
 import type { RelationToCreate } from '../processors/relation-builder.js';
 import { logger } from '../utils/logger.js';
 import { normalizeEntityName } from '../utils/cell-parsers.js';
