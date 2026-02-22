@@ -2,11 +2,12 @@
  * Upsert command handler - Create or link entities from an Excel spreadsheet
  *
  * Extracted from the monolithic src/index.ts to support subcommand CLI architecture.
- * Full upsert pipeline: parse → validate → build entity map → build relations → build ops → publish
+ * Full upsert pipeline: parse -> validate -> build entity map -> build relations -> build ops -> publish
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as readline from 'readline';
 
 import { parseExcelFile, checkRequiredTabs } from '../parsers/excel-parser.js';
 import { validateSpreadsheet, formatValidationErrors } from '../parsers/validators.js';
@@ -31,13 +32,47 @@ interface UpsertOptions {
   yes: boolean;
 }
 
+/**
+ * Resolve network from --network flag, GEO_NETWORK env var, or default to TESTNET.
+ * Flag takes precedence over env var, env var over default.
+ */
+function resolveNetwork(flagValue?: string): 'TESTNET' | 'MAINNET' {
+  const network = (flagValue || process.env.GEO_NETWORK || 'TESTNET').toUpperCase();
+  if (network !== 'TESTNET' && network !== 'MAINNET') {
+    throw new Error(`Invalid network: "${network}". Must be TESTNET or MAINNET.`);
+  }
+  return network as 'TESTNET' | 'MAINNET';
+}
+
+/**
+ * Interactive yes/no confirmation prompt using Node.js readline.
+ * Throws if stdin is not a TTY (pipe, CI) -- use --yes to skip in those environments.
+ */
+async function confirmAction(message: string): Promise<boolean> {
+  if (!process.stdin.isTTY) {
+    throw new Error('Interactive confirmation required. Use --yes to skip confirmation in non-interactive environments.');
+  }
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return new Promise((resolve) => {
+    rl.question(`${message} (yes/no): `, (answer) => {
+      rl.close();
+      resolve(answer.toLowerCase() === 'yes' || answer.toLowerCase() === 'y');
+    });
+  });
+}
+
 export async function upsertCommand(file: string, options: UpsertOptions): Promise<void> {
   // Set verbose mode
   setVerbose(options.verbose);
 
-  logger.section('Geo Publish');
+  const network = resolveNetwork(options.network);
+
+  logger.section('Geo Publish - Upsert');
   logger.keyValue('File', file);
-  logger.keyValue('Network', options.network ?? 'TESTNET');
+  logger.keyValue('Network', network);
   logger.keyValue('Dry Run', options.dryRun.toString());
 
   try {
@@ -50,8 +85,8 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
     // Get absolute path
     const filePath = path.resolve(file);
 
-    // Step 1: Check required tabs
-    logger.section('Step 1: Checking Structure');
+    // Check required tabs
+    logger.section('Checking Structure');
     const { missing, found } = checkRequiredTabs(filePath);
 
     if (missing.length > 0) {
@@ -64,12 +99,12 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
 
     logger.success(`All required tabs found: ${found.join(', ')}`);
 
-    // Step 2: Parse spreadsheet
-    logger.section('Step 2: Parsing Spreadsheet');
+    // Parse spreadsheet
+    logger.section('Parsing Spreadsheet');
     const data = parseExcelFile(filePath);
 
-    // Step 3: Validate data
-    logger.section('Step 3: Validating Data');
+    // Validate data
+    logger.section('Validating Data');
     const validation = validateSpreadsheet(data);
 
     if (!validation.isValid) {
@@ -85,18 +120,19 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
       logger.success('Validation passed');
     }
 
-    // Step 4: Build entity map (queries Geo API for existing entities)
-    logger.section('Step 4: Building Entity Map');
-    const network = (options.network ?? 'TESTNET').toUpperCase() as 'TESTNET' | 'MAINNET';
+    // Build entity map (queries Geo API for existing entities)
+    logger.section('Building Entity Map');
     logger.info('Querying Geo API for existing entities, types, and properties...');
-    const entityMap = await buildEntityMap(data, network);
+    const entityMap = await buildEntityMap(data, network, (current, total, label) => {
+      logger.progress(current, total, `Processing ${current}/${total} ${label}...`);
+    });
 
-    // Step 5: Build relations
-    logger.section('Step 5: Building Relations');
+    // Build relations
+    logger.section('Building Relations');
     const relations = buildRelations(data, entityMap);
 
-    // Step 6: Build operations batch
-    logger.section('Step 6: Building Operations Batch');
+    // Build operations batch
+    logger.section('Building Operations Batch');
     const batch = buildOperationsBatch(data, entityMap, relations);
     console.log(formatBatchSummary(batch.summary));
 
@@ -137,15 +173,15 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
 
     // Confirm before publishing
     if (!options.yes) {
-      console.log();
-      logger.warn('About to publish to Geo. This action cannot be undone.');
-      logger.info('Press Ctrl+C to cancel, or wait 5 seconds to continue...');
-
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      const confirmed = await confirmAction('About to publish to Geo. This action cannot be undone. Continue?');
+      if (!confirmed) {
+        logger.info('Publish cancelled by user.');
+        process.exit(0);
+      }
     }
 
-    // Step 7: Publish
-    logger.section('Step 7: Publishing');
+    // Publish
+    logger.section('Publishing');
     const publishOptions: PublishOptions = {
       network,
       dryRun: false,
