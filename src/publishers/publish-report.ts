@@ -1,69 +1,42 @@
 /**
- * Publish report generation
+ * Upsert-specific report generation
  *
- * Updated for new spreadsheet format:
- * - No geoId columns - use action from EntityMap
- * - Types and properties now have action='CREATE' or 'LINK'
+ * Generates UpsertReport instances conforming to the OperationReport discriminated union.
+ * Report saving is handled by the generalized saveOperationReport() in report.ts.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
 import type {
   ParsedSpreadsheet,
   EntityMap,
   PublishResult,
   BatchSummary,
-} from '../config/schema.js';
+} from '../config/upsert-types.js';
+import type { UpsertReport } from '../config/types.js';
 import type { RelationToCreate } from '../processors/relation-builder.js';
 import { logger } from '../utils/logger.js';
 import { normalizeEntityName } from '../utils/cell-parsers.js';
 
 /**
- * Full publish report data
- */
-export interface PublishReport {
-  timestamp: string;
-  success: boolean;
-  spaceId: string;
-  spaceType: string;
-  network: string;
-  editId?: string;
-  cid?: string;
-  transactionHash?: string;
-  error?: string;
-  summary: BatchSummary;
-  details: {
-    typesCreated: Array<{ name: string; id: string }>;
-    typesLinked: Array<{ name: string; id: string }>;
-    propertiesCreated: Array<{ name: string; id: string; dataType: string }>;
-    propertiesLinked: Array<{ name: string; id: string }>;
-    entitiesCreated: Array<{ name: string; id: string; types: string[] }>;
-    entitiesLinked: Array<{ name: string; id: string }>;
-    relationsCreated: Array<{
-      from: string;
-      to: string;
-      property: string;
-    }>;
-    multiTypeEntities: Array<{ name: string; types: string[] }>;
-  };
-}
-
-/**
- * Generate publish report
+ * Generate upsert report conforming to the OperationReport discriminated union.
+ *
+ * The caller must set `dryRun` on the returned report if this is a dry-run invocation.
  */
 export function generatePublishReport(
   data: ParsedSpreadsheet,
   entityMap: EntityMap,
   relations: RelationToCreate[],
   result: PublishResult,
-  network: string
-): PublishReport {
-  const report: PublishReport = {
+  network: string,
+  dryRun: boolean = false
+): UpsertReport {
+  const report: UpsertReport = {
+    operationType: 'upsert',
     timestamp: new Date().toISOString(),
     success: result.success,
+    network,
     spaceId: data.metadata.spaceId,
     spaceType: data.metadata.spaceType,
-    network,
+    dryRun,
     editId: result.editId,
     cid: result.cid,
     transactionHash: result.transactionHash,
@@ -111,7 +84,7 @@ export function generatePublishReport(
     }
   }
 
-  // Populate entities — only include created entities that actually got ops (have types)
+  // Populate entities -- only include created entities that actually got ops (have types)
   for (const entity of entityMap.entities.values()) {
     if (entity.action === 'LINK') {
       report.details.entitiesLinked.push({ name: entity.name, id: entity.id });
@@ -137,32 +110,9 @@ export function generatePublishReport(
 }
 
 /**
- * Save report to file
- */
-export function saveReport(report: PublishReport, outputDir: string): string {
-  // Ensure output directory exists
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  // Generate filename with timestamp
-  const timestamp = report.timestamp.replace(/[:.]/g, '-');
-  const status = report.success ? 'success' : 'failed';
-  const filename = `publish-report-${timestamp}-${status}.json`;
-  const filepath = path.join(outputDir, filename);
-
-  // Write report
-  fs.writeFileSync(filepath, JSON.stringify(report, null, 2));
-
-  logger.success(`Report saved to ${filepath}`);
-
-  return filepath;
-}
-
-/**
  * Print report summary to console
  */
-export function printReportSummary(report: PublishReport): void {
+export function printReportSummary(report: UpsertReport): void {
   logger.section('Publish Report');
 
   logger.keyValue('Timestamp', report.timestamp);
@@ -244,7 +194,7 @@ export function printPrePublishSummary(
   console.log();
   logger.subsection('Actions to be taken');
 
-  // Use batchSummary counts — these reflect what will actually get ops, not what was planned
+  // Use batchSummary counts -- these reflect what will actually get ops, not what was planned
   logger.table(
     ['Category', 'Will Create', 'Will Link'],
     [
@@ -255,7 +205,7 @@ export function printPrePublishSummary(
     ]
   );
 
-  // Entities that will actually be created (have types resolved — will get ops)
+  // Entities that will actually be created (have types resolved -- will get ops)
   const toCreate = Array.from(entityMap.entities.values()).filter(
     e => e.action === 'CREATE' && e.typeIds.length > 0
   );
@@ -278,9 +228,9 @@ export function printPrePublishSummary(
 
   if (skipped.length > 0) {
     console.log();
-    logger.subsection(`Entities Skipped — no types (${skipped.length})`);
+    logger.subsection(`Entities Skipped -- no types (${skipped.length})`);
     for (const entity of skipped) {
-      logger.listItem(`${entity.name} — not in any entity tab and not found in Geo`);
+      logger.listItem(`${entity.name} -- not in any entity tab and not found in Geo`);
     }
   }
 

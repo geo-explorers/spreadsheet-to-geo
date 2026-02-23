@@ -13,12 +13,8 @@ import {
   type Op,
   type Network,
 } from '@geoprotocol/geo-sdk';
-import type {
-  Metadata,
-  OperationsBatch,
-  PublishResult,
-  PublishOptions,
-} from '../config/schema.js';
+import type { Metadata, PublishOptions } from '../config/types.js';
+import type { OperationsBatch, PublishResult } from '../config/upsert-types.js';
 import { logger } from '../utils/logger.js';
 
 // Network configurations

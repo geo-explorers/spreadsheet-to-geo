@@ -1,33 +1,16 @@
 /**
- * TypeScript interfaces for the spreadsheet-to-Geo publishing script
+ * Upsert-specific type definitions
  *
- * Updated for new spreadsheet format:
- * - No "Related entities" tab (each type has its own tab)
- * - No "Geo ID" columns (use API search for deduplication)
- * - Any non-special tab is an entity tab
+ * These types are used only by the upsert pipeline (parse, validate, resolve, batch, publish).
+ * Shared types (Metadata, ValidationError, etc.) live in types.ts.
  */
 
 import type { Op } from '@geoprotocol/geo-sdk';
+import type { Metadata } from './types.js';
 
 // ============================================================================
 // Spreadsheet Tab Models
 // ============================================================================
-
-/**
- * Metadata tab - configuration for the publish batch
- */
-export interface Metadata {
-  spaceId: string;
-  spaceType: 'Personal' | 'DAO';
-  author?: string; // Author's personal space ID
-  sourceDate?: string;
-  preparedBy?: string;
-  reviewedBy?: string;
-  publishedBy?: string;
-  publishDate?: string;
-  notes?: string;
-  readyForPublishing?: boolean;
-}
 
 /**
  * Types tab - type definitions
@@ -63,7 +46,7 @@ export interface PropertyDefinition {
 
 /**
  * Generic entity from any entity tab
- * Tab name determines the entity type (e.g., "Person" tab → type "Person")
+ * Tab name determines the entity type (e.g., "Person" tab -> type "Person")
  * Note: No geoId column - we search for existing entities by name via API
  */
 export interface SpreadsheetEntity {
@@ -145,15 +128,8 @@ export interface BatchSummary {
 }
 
 // ============================================================================
-// Publishing
+// Publish Result
 // ============================================================================
-
-export interface PublishOptions {
-  network: 'TESTNET' | 'MAINNET';
-  dryRun: boolean;
-  verbose: boolean;
-  outputDir: string;
-}
 
 export interface PublishResult {
   success: boolean;
@@ -163,45 +139,3 @@ export interface PublishResult {
   error?: string;
   summary: BatchSummary;
 }
-
-// ============================================================================
-// Validation
-// ============================================================================
-
-export type ValidationSeverity = 'error' | 'warning';
-
-export interface ValidationError {
-  tab: string;
-  row?: number;
-  column?: string;
-  message: string;
-  severity: ValidationSeverity;
-}
-
-export interface ValidationResult {
-  isValid: boolean;
-  errors: ValidationError[];
-}
-
-// ============================================================================
-// Column Mapping
-// ============================================================================
-
-// Standard column names (case-insensitive matching)
-export const STANDARD_COLUMNS = {
-  ENTITY_NAME: 'entity name',
-  TYPES: 'types',
-  TYPE: 'type',
-  TYPE_NAME: 'type name',
-  PROPERTY_NAME: 'property name',
-  DATA_TYPE: 'data type',
-  DESCRIPTION: 'description',
-  FIELD: 'field',
-  VALUE: 'value',
-} as const;
-
-// Special tabs that are NOT entity tabs
-export const SPECIAL_TABS = ['Metadata', 'Types', 'Properties'] as const;
-
-// Required tabs
-export const REQUIRED_TABS = ['Metadata', 'Types', 'Properties'] as const;

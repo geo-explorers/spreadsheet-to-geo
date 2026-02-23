@@ -15,7 +15,7 @@ import type {
   ResolvedProperty,
   PropertyDefinition,
   TypeDefinition,
-} from '../config/schema.js';
+} from '../config/upsert-types.js';
 import { normalizeEntityName, generateGeoId } from '../utils/cell-parsers.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -32,7 +32,8 @@ import {
  */
 export async function buildEntityMap(
   data: ParsedSpreadsheet,
-  network: 'TESTNET' | 'MAINNET'
+  network: 'TESTNET' | 'MAINNET',
+  onProgress?: (current: number, total: number, label: string) => void
 ): Promise<EntityMap> {
   logger.section('Building Entity Map');
 
@@ -77,7 +78,7 @@ export async function buildEntityMap(
   await processProperties(data.properties, entityMap, existingProperties);
 
   // 7. Process all entities - use existing IDs or generate new
-  await processEntities(data.entities, entityMap, existingEntities);
+  await processEntities(data.entities, entityMap, existingEntities, onProgress);
 
   // 8. Detect multi-type entities
   detectMultiTypeEntities(entityMap);
@@ -222,7 +223,8 @@ async function processEntities(
     relations: Record<string, string[]>;
   }>,
   entityMap: EntityMap,
-  existingEntities: Map<string, { id: string; name: string; types: Array<{ id: string; name: string }>; spaceIds: string[] }>
+  existingEntities: Map<string, { id: string; name: string; types: Array<{ id: string; name: string }>; spaceIds: string[] }>,
+  onProgress?: (current: number, total: number, label: string) => void
 ): Promise<void> {
   logger.subsection('Processing Entities');
 
@@ -278,7 +280,12 @@ async function processEntities(
   }
 
   // Second pass: create resolved entities
+  let processed = 0;
+  const total = byName.size;
   for (const [normalized, data] of byName) {
+    processed++;
+    if (onProgress) onProgress(processed, total, 'entities');
+
     if (data.existing) {
       // Link to existing entity
       const resolved: ResolvedEntity = {
