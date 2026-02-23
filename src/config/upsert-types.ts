@@ -55,6 +55,8 @@ export interface SpreadsheetEntity {
   properties: Record<string, string>; // Column name -> value
   relations: Record<string, string[]>; // Property name -> array of entity names
   sourceTab: string; // Which tab this came from
+  avatarUrl?: string; // Optional URL to avatar image
+  coverUrl?: string; // Optional URL to cover image
 }
 
 // ============================================================================
@@ -94,6 +96,7 @@ export interface ResolvedProperty {
   id: string;
   action: EntityAction;
   definition: PropertyDefinition;
+  geoDataType?: string; // Actual dataType from Geo API (e.g. "Datetime" when spreadsheet says "DATE")
 }
 
 export interface EntityMap {
@@ -124,6 +127,7 @@ export interface BatchSummary {
   entitiesCreated: number;
   entitiesLinked: number;
   relationsCreated: number;
+  imagesUploaded: number;
   multiTypeEntities: Array<{ name: string; types: string[] }>;
 }
 

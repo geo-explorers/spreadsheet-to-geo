@@ -11,6 +11,9 @@ dist/
 # Reports (generated)
 reports/
 
+#testing-datasets 
+testing-datasets/
+
 # OS files
 .DS_Store
 Thumbs.db

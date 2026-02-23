@@ -14,6 +14,7 @@ import { validateSpreadsheet, formatValidationErrors } from '../parsers/validato
 import { buildEntityMap } from '../processors/entity-processor.js';
 import { buildRelations } from '../processors/relation-builder.js';
 import { buildOperationsBatch, formatBatchSummary } from '../processors/batch-builder.js';
+import { fetchExistingRelations } from '../api/geo-client.js';
 import { publishToGeo, validatePrivateKey } from '../publishers/publisher.js';
 import {
   generatePublishReport,
@@ -129,11 +130,32 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
 
     // Build relations
     logger.section('Building Relations');
-    const relations = buildRelations(data, entityMap);
+    let relations = buildRelations(data, entityMap);
+
+    // Deduplicate relations against existing ones in the space
+    if (relations.length > 0 && data.metadata.spaceId && data.metadata.spaceId !== 'placeholder_space_id_for_dry_run') {
+      logger.section('Deduplicating Relations');
+      const fromEntityIds = [...new Set(relations.map(r => r.fromEntityId))];
+      const existingKeys = await fetchExistingRelations(fromEntityIds, data.metadata.spaceId, network);
+
+      if (existingKeys.size > 0) {
+        const before = relations.length;
+        relations = relations.filter(r => {
+          const key = `${r.fromEntityId}:${r.toEntityId}:${r.propertyId}`;
+          return !existingKeys.has(key);
+        });
+        const skipped = before - relations.length;
+        if (skipped > 0) {
+          logger.warn(`Skipped ${skipped} duplicate relations (already exist in space)`);
+        } else {
+          logger.success('No duplicate relations found');
+        }
+      }
+    }
 
     // Build operations batch
     logger.section('Building Operations Batch');
-    const batch = buildOperationsBatch(data, entityMap, relations);
+    const batch = await buildOperationsBatch(data, entityMap, relations, network as 'TESTNET');
     console.log(formatBatchSummary(batch.summary));
 
     // Print pre-publish summary

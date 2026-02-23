@@ -22,6 +22,7 @@ import {
   searchEntitiesByNames,
   searchTypesByNames,
   searchPropertiesByNames,
+  findEntityInSpace,
 } from '../api/geo-client.js';
 
 /**
@@ -78,7 +79,7 @@ export async function buildEntityMap(
   await processProperties(data.properties, entityMap, existingProperties);
 
   // 7. Process all entities - use existing IDs or generate new
-  await processEntities(data.entities, entityMap, existingEntities, onProgress);
+  await processEntities(data.entities, entityMap, existingEntities, data.metadata.spaceId, network, onProgress);
 
   // 8. Detect multi-type entities
   detectMultiTypeEntities(entityMap);
@@ -184,13 +185,21 @@ async function processProperties(
         id: existing.id,
         action: 'LINK',
         definition: prop,
+        geoDataType: existing.dataTypeName || undefined,
       };
       entityMap.properties.set(normalized, resolved);
       linked++;
       logger.debug(`Property: ${prop.name} → LINK`, {
         id: existing.id,
-        dataType: existing.dataTypeName,
+        geoDataType: existing.dataTypeName || '(unknown)',
       });
+
+      // Warn if spreadsheet dataType differs from what Geo has
+      if (existing.dataTypeName && existing.dataTypeName.toUpperCase() !== prop.dataType.toUpperCase()) {
+        logger.warn(
+          `Property "${prop.name}" dataType mismatch: spreadsheet says ${prop.dataType}, Geo has ${existing.dataTypeName} — using Geo's type`
+        );
+      }
     } else {
       // Create new property
       const resolved: ResolvedProperty = {
@@ -224,6 +233,8 @@ async function processEntities(
   }>,
   entityMap: EntityMap,
   existingEntities: Map<string, { id: string; name: string; types: Array<{ id: string; name: string }>; spaceIds: string[] }>,
+  spaceId: string,
+  network: 'TESTNET' | 'MAINNET',
   onProgress?: (current: number, total: number, label: string) => void
 ): Promise<void> {
   logger.subsection('Processing Entities');
@@ -282,27 +293,86 @@ async function processEntities(
   // Second pass: create resolved entities
   let processed = 0;
   const total = byName.size;
+  let typeSkipped = 0;
+
   for (const [normalized, data] of byName) {
     processed++;
     if (onProgress) onProgress(processed, total, 'entities');
 
     if (data.existing) {
-      // Link to existing entity
-      const resolved: ResolvedEntity = {
-        name: data.name,
-        id: data.existing.id,
-        types: data.existing.types.map(t => t.name),
-        typeIds: data.existing.types.map(t => t.id),
-        action: 'LINK',
-        sourceTab: data.sourceTab || undefined,
-      };
-      entityMap.entities.set(normalized, resolved);
-      linked++;
-      logger.debug(`Entity: ${data.name} → LINK`, {
-        id: data.existing.id,
-        types: resolved.types,
-      });
-    } else {
+      // Type-aware check: if the spreadsheet declares types for this entity,
+      // verify the API match shares at least one type. Otherwise, we're
+      // linking to the wrong entity (e.g. "anthropic" External Service vs
+      // "Anthropic" Project).
+      const spreadsheetTypes = data.types;
+      const geoTypes = data.existing.types.map(t => normalizeEntityName(t.name));
+      const hasTypeOverlap = spreadsheetTypes.size === 0 || // relation targets with no types → accept any match
+        Array.from(spreadsheetTypes).some(t => geoTypes.includes(normalizeEntityName(t)));
+
+      if (!hasTypeOverlap) {
+        // Type mismatch with search result. Before creating new, check if
+        // the target space already has an entity with this name and matching
+        // type (e.g. from a previous publish). The live entities query has
+        // no indexing delay unlike the search API.
+        const isValidSpace = spaceId && spaceId !== 'placeholder_space_id_for_dry_run';
+        const spaceMatch = isValidSpace
+          ? await findEntityInSpace(data.name, spaceId, network)
+          : null;
+
+        if (spaceMatch) {
+          const spaceMatchTypes = spaceMatch.types.map(t => normalizeEntityName(t.name));
+          const spaceTypeOverlap = Array.from(spreadsheetTypes).some(t =>
+            spaceMatchTypes.includes(normalizeEntityName(t))
+          );
+
+          if (spaceTypeOverlap) {
+            // Found a matching entity in target space — link to it
+            const resolved: ResolvedEntity = {
+              name: data.name,
+              id: spaceMatch.id,
+              types: spaceMatch.types.map(t => t.name),
+              typeIds: spaceMatch.types.map(t => t.id),
+              action: 'LINK',
+              sourceTab: data.sourceTab || undefined,
+            };
+            entityMap.entities.set(normalized, resolved);
+            linked++;
+            logger.debug(`Entity: ${data.name} → LINK (found in target space)`, {
+              id: spaceMatch.id,
+              types: resolved.types,
+            });
+            continue;
+          }
+        }
+
+        // No match in target space either — create new
+        typeSkipped++;
+        logger.warn(
+          `Entity "${data.name}" found in Geo as "${data.existing.types.map(t => t.name).join(', ')}" ` +
+          `but spreadsheet expects "${Array.from(spreadsheetTypes).join(', ')}" — creating new entity`
+        );
+        // Fall through to CREATE below
+      } else {
+        // Link to existing entity
+        const resolved: ResolvedEntity = {
+          name: data.name,
+          id: data.existing.id,
+          types: data.existing.types.map(t => t.name),
+          typeIds: data.existing.types.map(t => t.id),
+          action: 'LINK',
+          sourceTab: data.sourceTab || undefined,
+        };
+        entityMap.entities.set(normalized, resolved);
+        linked++;
+        logger.debug(`Entity: ${data.name} → LINK`, {
+          id: data.existing.id,
+          types: resolved.types,
+        });
+        continue;
+      }
+    }
+
+    {
       // Create new entity
       const types = Array.from(data.types);
 
@@ -334,6 +404,10 @@ async function processEntities(
         types,
       });
     }
+  }
+
+  if (typeSkipped > 0) {
+    logger.warn(`Skipped ${typeSkipped} API matches due to type mismatch — created new entities instead`);
   }
 
   logger.info(`Processed ${byName.size} entities`, { toCreate: created, toLink: linked });
@@ -518,3 +592,4 @@ export function getResolvedProperty(
   const normalized = normalizeEntityName(name);
   return entityMap.properties.get(normalized);
 }
+

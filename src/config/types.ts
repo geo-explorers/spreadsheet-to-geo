@@ -113,6 +113,7 @@ export interface UpsertReport extends ReportBase {
     entitiesCreated: number;
     entitiesLinked: number;
     relationsCreated: number;
+    imagesUploaded: number;
     multiTypeEntities: Array<{ name: string; types: string[] }>;
   };
   details: {

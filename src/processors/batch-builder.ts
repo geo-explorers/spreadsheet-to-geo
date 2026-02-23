@@ -9,10 +9,12 @@
 
 import {
   Graph,
+  ContentIds,
   type Op,
   type DataType,
   type TypedValue,
   type PropertyValueParam,
+  type Network,
 } from '@geoprotocol/geo-sdk';
 import type {
   ParsedSpreadsheet,
@@ -22,17 +24,21 @@ import type {
   PropertyDefinition,
 } from '../config/upsert-types.js';
 import type { RelationToCreate } from './relation-builder.js';
-import { normalizeEntityName, parseDate, parseTime, parseDatetime } from '../utils/cell-parsers.js';
+import { normalizeEntityName, parseDate, parseTime, parseDatetime, parseMultiValueList } from '../utils/cell-parsers.js';
 import { logger } from '../utils/logger.js';
+
+/** Maps normalized entity name → { avatarImageId?, coverImageId? } */
+export type ImageMap = Map<string, { avatarImageId?: string; coverImageId?: string }>;
 
 /**
  * Build operations batch from parsed data using the Geo SDK directly
  */
-export function buildOperationsBatch(
+export async function buildOperationsBatch(
   data: ParsedSpreadsheet,
   entityMap: EntityMap,
-  relations: RelationToCreate[]
-): OperationsBatch {
+  relations: RelationToCreate[],
+  network: Network = 'TESTNET'
+): Promise<OperationsBatch> {
   logger.section('Building Operations Batch');
 
   const ops: Op[] = [];
@@ -44,6 +50,7 @@ export function buildOperationsBatch(
     entitiesCreated: 0,
     entitiesLinked: 0,
     relationsCreated: 0,
+    imagesUploaded: 0,
     multiTypeEntities: [],
   };
 
@@ -55,9 +62,13 @@ export function buildOperationsBatch(
   logger.subsection('Phase 2: Types');
   buildTypeOps(data.types, entityMap, ops, summary);
 
+  // Phase 2.5: Upload images (avatar/cover URLs)
+  logger.subsection('Phase 2.5: Images');
+  const imageMap = await buildImageOps(data, ops, summary, network);
+
   // Phase 3: Create entities (skip linked entities)
   logger.subsection('Phase 3: Entities');
-  buildEntityOps(data, entityMap, ops, summary);
+  buildEntityOps(data, entityMap, ops, summary, imageMap);
 
   // Phase 4: Create relations
   logger.subsection('Phase 4: Relations');
@@ -146,18 +157,110 @@ function buildTypeOps(
       continue;
     }
 
+    // Resolve default properties to IDs
+    const propertyIds: string[] = [];
+    if (type.defaultProperties) {
+      const propNames = parseMultiValueList(type.defaultProperties);
+      for (const propName of propNames) {
+        const resolvedProp = entityMap.properties.get(normalizeEntityName(propName));
+        if (resolvedProp) {
+          propertyIds.push(resolvedProp.id);
+        } else {
+          logger.debug(`Default property "${propName}" for type "${type.name}" not found in map — skipping`);
+        }
+      }
+    }
+
     // Need to create
     const { ops: typeOps } = Graph.createType({
       id: resolved.id,
       name: type.name,
       description: type.description,
+      ...(propertyIds.length > 0 && { properties: propertyIds }),
     });
 
     ops.push(...typeOps);
     summary.typesCreated++;
 
-    logger.debug(`Type CREATE: ${type.name}`, { id: resolved.id });
+    logger.debug(`Type CREATE: ${type.name}`, {
+      id: resolved.id,
+      ...(propertyIds.length > 0 && { defaultProperties: propertyIds.length }),
+    });
   }
+}
+
+/**
+ * Upload images (avatar/cover URLs) and collect their entity IDs
+ * Deduplicates by URL so the same image isn't uploaded twice
+ */
+async function buildImageOps(
+  data: ParsedSpreadsheet,
+  ops: Op[],
+  summary: BatchSummary,
+  network: Network
+): Promise<ImageMap> {
+  const imageMap: ImageMap = new Map();
+
+  // Collect all unique URLs and which entities reference them
+  const urlToEntities = new Map<string, { normalized: string; field: 'avatar' | 'cover' }[]>();
+
+  for (const entity of data.entities) {
+    const normalized = normalizeEntityName(entity.name);
+
+    if (entity.avatarUrl) {
+      const entries = urlToEntities.get(entity.avatarUrl) || [];
+      entries.push({ normalized, field: 'avatar' });
+      urlToEntities.set(entity.avatarUrl, entries);
+    }
+    if (entity.coverUrl) {
+      const entries = urlToEntities.get(entity.coverUrl) || [];
+      entries.push({ normalized, field: 'cover' });
+      urlToEntities.set(entity.coverUrl, entries);
+    }
+  }
+
+  if (urlToEntities.size === 0) {
+    logger.debug('No image URLs found');
+    return imageMap;
+  }
+
+  logger.info(`Uploading ${urlToEntities.size} unique image(s)...`);
+
+  // Upload each unique URL
+  for (const [url, refs] of urlToEntities) {
+    try {
+      const result = await Graph.createImage({ url, network });
+      ops.push(...result.ops);
+      summary.imagesUploaded++;
+
+      logger.debug(`Image uploaded: ${url}`, {
+        id: result.id,
+        cid: result.cid,
+        dimensions: result.dimensions,
+      });
+
+      // Map the image ID back to all entities that reference this URL
+      for (const { normalized, field } of refs) {
+        const existing = imageMap.get(normalized) || {};
+        if (field === 'avatar') {
+          existing.avatarImageId = result.id;
+        } else {
+          existing.coverImageId = result.id;
+        }
+        imageMap.set(normalized, existing);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`Failed to upload image ${url}: ${message}`);
+      // Continue — entity will be created without the image
+    }
+  }
+
+  if (summary.imagesUploaded > 0) {
+    logger.success(`Uploaded ${summary.imagesUploaded} image(s)`);
+  }
+
+  return imageMap;
 }
 
 /**
@@ -168,7 +271,8 @@ function buildEntityOps(
   data: ParsedSpreadsheet,
   entityMap: EntityMap,
   ops: Op[],
-  summary: BatchSummary
+  summary: BatchSummary,
+  imageMap: ImageMap
 ): void {
   // Track processed entities to avoid duplicates
   const processedNames = new Set<string>();
@@ -205,22 +309,39 @@ function buildEntityOps(
     );
     const description = descriptionKey ? spreadsheetEntity.properties[descriptionKey] : undefined;
 
-    // Use SDK to create entity
+    // Look up image IDs for this entity
+    const images = imageMap.get(normalized);
+
+    // Use SDK to create entity (cover is a built-in param)
     const { ops: entityOps } = Graph.createEntity({
       id: entity.id,
       name: spreadsheetEntity.name,
       description,
       types: entity.typeIds,
       values,
+      ...(images?.coverImageId && { cover: images.coverImageId }),
     });
 
     ops.push(...entityOps);
+
+    // Avatar is set via AVATAR_PROPERTY relation
+    if (images?.avatarImageId) {
+      const { ops: avatarOps } = Graph.createRelation({
+        fromEntity: entity.id,
+        toEntity: images.avatarImageId,
+        type: ContentIds.AVATAR_PROPERTY,
+      });
+      ops.push(...avatarOps);
+    }
+
     summary.entitiesCreated++;
 
     logger.debug(`Entity CREATE: ${spreadsheetEntity.name}`, {
       id: entity.id,
       types: entity.types,
       valueCount: values.length,
+      ...(images?.coverImageId && { cover: true }),
+      ...(images?.avatarImageId && { avatar: true }),
     });
   }
 
@@ -269,12 +390,23 @@ function buildRelationOps(
   ops: Op[],
   summary: BatchSummary
 ): void {
+  let skippedDangling = 0;
+
   for (const relation of relations) {
-    // Use SDK to create relation
+    // Skip relations where the target was never created (no types, not in Geo)
+    const toEntity = entityMap.entities.get(normalizeEntityName(relation.toEntityName));
+    if (toEntity?.action === 'CREATE' && toEntity.typeIds.length === 0) {
+      skippedDangling++;
+      logger.warn(`Skipping relation ${relation.fromEntityName} → ${relation.toEntityName}: target has no types and wasn't found in Geo`);
+      continue;
+    }
+
+    // Use SDK to create relation with position for ordering
     const { ops: relationOps } = Graph.createRelation({
       fromEntity: relation.fromEntityId,
       toEntity: relation.toEntityId,
       type: relation.propertyId,
+      position: relation.position,
     });
 
     ops.push(...relationOps);
@@ -285,6 +417,10 @@ function buildRelationOps(
       to: relation.toEntityName,
       via: relation.propertyName,
     });
+  }
+
+  if (skippedDangling > 0) {
+    logger.warn(`Skipped ${skippedDangling} relations with unresolvable targets`);
   }
 }
 
@@ -317,8 +453,14 @@ function buildPropertyValues(
     const resolved = entityMap.properties.get(normalizeEntityName(propertyName));
     if (!resolved) continue;
 
+    // Use Geo's actual dataType when available (linked properties may have
+    // a different type than what the spreadsheet declares, e.g. DATE vs Datetime)
+    const effectiveDataType = resolved.geoDataType
+      ? resolved.geoDataType.toUpperCase() as PropertyDefinition['dataType']
+      : propDef.dataType;
+
     // Convert value to SDK TypedValue format
-    const typedValue = convertToTypedValue(value, propDef.dataType);
+    const typedValue = convertToTypedValue(value, effectiveDataType);
     if (!typedValue) continue;
 
     values.push({
@@ -403,6 +545,7 @@ export function formatBatchSummary(summary: BatchSummary): string {
     `Properties: ${summary.propertiesCreated} create, ${summary.propertiesLinked} link`,
     `Types:      ${summary.typesCreated} create, ${summary.typesLinked} link`,
     `Entities:   ${summary.entitiesCreated} create, ${summary.entitiesLinked} link`,
+    `Images:     ${summary.imagesUploaded} uploaded`,
     `Relations:  ${summary.relationsCreated} create`,
     '─'.repeat(40),
   ];

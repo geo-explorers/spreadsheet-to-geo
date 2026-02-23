@@ -265,8 +265,17 @@ function parsePropertiesTab(workbook: XLSX.WorkBook): PropertyDefinition[] {
     if (!name) continue;
 
     const dataTypeRaw = getStringCell(row, 'Data type') || 'TEXT';
-    // Map TIME to the correct SDK type (TIME in spreadsheet maps to TIME in SDK)
-    let dataType = dataTypeRaw.toUpperCase() as PropertyDefinition['dataType'];
+    // Normalize common aliases to canonical SDK type names
+    const DATA_TYPE_ALIASES: Record<string, PropertyDefinition['dataType']> = {
+      INT64: 'INTEGER',
+      INT: 'INTEGER',
+      FLOAT64: 'FLOAT',
+      DOUBLE: 'FLOAT',
+      DECIMAL: 'FLOAT',
+      BOOL: 'BOOLEAN',
+    };
+    const upper = dataTypeRaw.toUpperCase();
+    let dataType = (DATA_TYPE_ALIASES[upper] ?? upper) as PropertyDefinition['dataType'];
 
     const property: PropertyDefinition = {
       name,
@@ -352,23 +361,31 @@ function parseEntityTab(
     const typesRaw = getStringCell(row, 'Types') || getStringCell(row, 'Type');
     const types = typesRaw ? parseSemicolonList(typesRaw) : [defaultType];
 
+    // Extract optional image URLs
+    const avatarUrl = getStringCell(row, 'Avatar URL') || getStringCell(row, 'Avatar url') || undefined;
+    const coverUrl = getStringCell(row, 'Cover URL') || getStringCell(row, 'Cover url') || undefined;
+
     const entity: SpreadsheetEntity = {
       name,
       types,
       properties: {},
       relations: {},
       sourceTab: sheetName,
+      ...(avatarUrl && { avatarUrl }),
+      ...(coverUrl && { coverUrl }),
     };
 
     // Process each column
     for (const colName of columnNames) {
       const normalizedCol = normalizeColumnName(colName);
 
-      // Skip standard columns
+      // Skip standard columns and image columns
       if (
         normalizedCol === 'entity name' ||
         normalizedCol === 'types' ||
-        normalizedCol === 'type'
+        normalizedCol === 'type' ||
+        normalizedCol === 'avatar url' ||
+        normalizedCol === 'cover url'
       ) {
         continue;
       }

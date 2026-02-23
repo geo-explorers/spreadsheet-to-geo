@@ -154,6 +154,7 @@ export function printReportSummary(report: UpsertReport): void {
         String(report.summary.entitiesCreated),
         String(report.summary.entitiesLinked),
       ],
+      ['Images', String(report.summary.imagesUploaded), '-'],
       ['Relations', String(report.summary.relationsCreated), '-'],
     ]
   );
@@ -201,6 +202,7 @@ export function printPrePublishSummary(
       ['Types', String(batchSummary.typesCreated), String(batchSummary.typesLinked)],
       ['Properties', String(batchSummary.propertiesCreated), String(batchSummary.propertiesLinked)],
       ['Entities', String(batchSummary.entitiesCreated), String(batchSummary.entitiesLinked)],
+      ['Images', String(batchSummary.imagesUploaded), '-'],
       ['Relations', String(batchSummary.relationsCreated), '-'],
     ]
   );

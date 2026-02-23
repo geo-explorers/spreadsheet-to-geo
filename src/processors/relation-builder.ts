@@ -1,9 +1,9 @@
 /**
  * Relation building - create relations between entities
  *
- * Updated for new spreadsheet format:
- * - Skip relations for LINK entities (can't modify existing entities in other spaces)
- * - Relations are only created for entities we're creating (action='CREATE')
+ * Relations are built for ALL entities (CREATE and LINK). Creating a relation
+ * FROM a linked entity does NOT modify that entity — the relation lives in
+ * the publishing space. GRC-20 allows cross-space relations.
  */
 
 import type {
@@ -29,13 +29,13 @@ export interface RelationToCreate {
   toEntityName: string;
   propertyId: string;
   propertyName: string;
+  position: string; // Row-based ordering string for display order in Geo UI
 }
 
 /**
  * Build list of relations to create from spreadsheet data
  *
- * Only creates relations for entities with action='CREATE'.
- * Linked entities (existing in Geo) can't have new relations added.
+ * Creates relations for all entities — both CREATE and LINK.
  */
 export function buildRelations(
   data: ParsedSpreadsheet,
@@ -45,20 +45,20 @@ export function buildRelations(
 
   const relations: RelationToCreate[] = [];
   const errors: string[] = [];
-  let skippedLinked = 0;
+  let linkedWithRelations = 0;
 
-  // Process each entity's relation columns
+  // Track position per (fromEntity, property) for ordering in Geo UI
+  const positionCounters = new Map<string, number>();
+
+  // Process each entity's relation columns (both CREATE and LINK entities)
   for (const entity of data.entities) {
-    // Check if this entity is being created or linked
     const resolvedEntity = getResolvedEntity(entity.name, entityMap);
-    if (resolvedEntity?.action === 'LINK') {
-      // Skip relations for linked entities - we can't modify entities in other spaces
-      skippedLinked++;
-      logger.debug(`Skipping relations for linked entity: ${entity.name}`);
-      continue;
-    }
-
     const fromEntityId = resolveEntityId(entity.name, entityMap);
+
+    // Track linked entities that have outbound relations (informational)
+    if (resolvedEntity?.action === 'LINK' && Object.keys(entity.relations).length > 0) {
+      linkedWithRelations++;
+    }
 
     for (const [propertyName, targetNames] of Object.entries(entity.relations)) {
       // Get property ID
@@ -90,6 +90,11 @@ export function buildRelations(
           continue;
         }
 
+        // Auto-position: increment counter per (fromEntity, property) pair
+        const posKey = `${fromEntityId}:${propertyId}`;
+        const pos = positionCounters.get(posKey) ?? 0;
+        positionCounters.set(posKey, pos + 1);
+
         relations.push({
           fromEntityId,
           fromEntityName: entity.name,
@@ -97,6 +102,7 @@ export function buildRelations(
           toEntityName: targetName,
           propertyId,
           propertyName,
+          position: String(pos),
         });
 
         logger.debug('Relation', {
@@ -117,7 +123,7 @@ export function buildRelations(
   }
 
   logger.success(`Built ${relations.length} relations`, {
-    skippedLinkedEntities: skippedLinked,
+    linkedEntitiesWithRelations: linkedWithRelations,
   });
 
   return relations;

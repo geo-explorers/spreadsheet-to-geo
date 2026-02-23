@@ -152,34 +152,88 @@ const ENTITY_DETAILS_QUERY = `
 `;
 
 /**
+ * GraphQL query for fetching property details (dataType) by IDs.
+ * Uses the `properties` root query which returns dataTypeName/dataTypeId
+ * without needing to traverse DATA_TYPE relations manually.
+ */
+const PROPERTY_DETAILS_QUERY = `
+  query PropertyDetails($ids: [UUID!]!) {
+    properties(filter: { id: { in: $ids } }) {
+      id
+      name
+      dataTypeName
+      dataTypeId
+    }
+  }
+`;
+
+/**
  * Execute a GraphQL query against the Geo API
  */
 async function executeQuery<T>(
   query: string,
   variables: Record<string, unknown>,
-  network: 'TESTNET' | 'MAINNET'
+  network: 'TESTNET' | 'MAINNET',
+  maxRetries = 3
 ): Promise<T> {
   const endpoint = API_ENDPOINTS[network];
+  const timeoutMs = 30_000;
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+
+      // Retry on server errors (5xx)
+      if (response.status >= 500 && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+        logger.debug(`API returned ${response.status}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new Error(`GraphQL request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json() as { data?: T; errors?: Array<{ message: string }> };
+
+      if (result.errors) {
+        throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
+      }
+
+      return result.data as T;
+    } catch (error) {
+      clearTimeout(timer);
+
+      // Retry on network errors and timeouts
+      const isRetryable =
+        error instanceof Error &&
+        (error.name === 'AbortError' || error.message.includes('fetch failed'));
+
+      if (isRetryable && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        logger.debug(`API request failed (${error instanceof Error ? error.message : 'unknown'}), retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      throw error;
+    }
   }
 
-  const result = await response.json() as { data?: T; errors?: Array<{ message: string }> };
-
-  if (result.errors) {
-    throw new Error(`GraphQL errors: ${JSON.stringify(result.errors)}`);
-  }
-
-  return result.data as T;
+  throw new Error('executeQuery: exhausted all retries');
 }
 
 /**
@@ -272,7 +326,7 @@ export async function searchEntitiesByNames(
 
     processed += batch.length;
     if (names.length > batchSize) {
-      logger.debug(`Searched ${processed}/${names.length} entities...`);
+      logger.info(`Searched ${processed}/${names.length} entities...`);
     }
   }
 
@@ -297,15 +351,22 @@ export async function searchTypesByNames(
 
   logger.info(`Searching for ${names.length} types in Geo...`);
 
-  // Search each type name
-  for (const name of names) {
-    const entity = await searchEntityByName(name, ROOT_SPACE_ID, network);
-    if (entity) {
-      const normalized = normalizeEntityName(name);
-      results.set(normalized, {
-        id: entity.id,
-        name: entity.name,
-      });
+  // Search types in parallel batches (same pattern as entities)
+  const batchSize = 20;
+  for (let i = 0; i < names.length; i += batchSize) {
+    const batch = names.slice(i, i + batchSize);
+    const searchResults = await Promise.all(
+      batch.map(name => searchEntityByName(name, ROOT_SPACE_ID, network))
+    );
+
+    for (let j = 0; j < batch.length; j++) {
+      const entity = searchResults[j];
+      if (entity) {
+        results.set(normalizeEntityName(batch[j]), {
+          id: entity.id,
+          name: entity.name,
+        });
+      }
     }
   }
 
@@ -330,18 +391,54 @@ export async function searchPropertiesByNames(
 
   logger.info(`Searching for ${names.length} properties in Geo...`);
 
-  // Search each property name
-  for (const name of names) {
-    const entity = await searchEntityByName(name, ROOT_SPACE_ID, network);
-    if (entity) {
-      const normalized = normalizeEntityName(name);
-      // Note: We're treating properties as entities here
-      // The actual property lookup would need a different query
-      results.set(normalized, {
-        id: entity.id,
-        name: entity.name,
-        dataTypeId: '', // Would need property-specific query
-        dataTypeName: '', // Would need property-specific query
+  // Step 1: Search property names in parallel batches
+  const batchSize = 20;
+  for (let i = 0; i < names.length; i += batchSize) {
+    const batch = names.slice(i, i + batchSize);
+    const searchResults = await Promise.all(
+      batch.map(name => searchEntityByName(name, ROOT_SPACE_ID, network))
+    );
+
+    for (let j = 0; j < batch.length; j++) {
+      const entity = searchResults[j];
+      if (entity) {
+        results.set(normalizeEntityName(batch[j]), {
+          id: entity.id,
+          name: entity.name,
+          dataTypeId: '',
+          dataTypeName: '',
+        });
+      }
+    }
+  }
+
+  // Step 2: Batch-query property details to get dataType info
+  const foundIds = Array.from(results.values()).map(p => p.id);
+  if (foundIds.length > 0) {
+    logger.debug(`Querying data types for ${foundIds.length} properties...`);
+    try {
+      const batchSize = 50;
+      for (let i = 0; i < foundIds.length; i += batchSize) {
+        const batch = foundIds.slice(i, i + batchSize);
+        const data = await executeQuery<{
+          properties: Array<{ id: string; name: string; dataTypeName: string | null; dataTypeId: string | null }>;
+        }>(PROPERTY_DETAILS_QUERY, { ids: batch }, network);
+
+        // Update results with dataType info
+        for (const prop of data.properties ?? []) {
+          // Find the result entry by ID
+          for (const [, val] of results) {
+            if (val.id === prop.id) {
+              val.dataTypeId = prop.dataTypeId ?? '';
+              val.dataTypeName = prop.dataTypeName ?? '';
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch property data types (non-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }
@@ -349,6 +446,91 @@ export async function searchPropertiesByNames(
   logger.success(`Found ${results.size}/${names.length} existing properties`);
 
   return results;
+}
+
+/**
+ * Query entity by exact name in a specific space using the live entities index
+ * (not the search index, which has indexing delay).
+ * Used as a fallback when search finds a type-mismatched entity.
+ */
+export async function findEntityInSpace(
+  name: string,
+  spaceId: string,
+  network: 'TESTNET' | 'MAINNET'
+): Promise<GeoEntity | null> {
+  try {
+    const data = await executeQuery<{ entities: GeoEntity[] }>(
+      ENTITIES_QUERY,
+      { filter: { name: { is: name } }, spaceId, limit: 5 },
+      network
+    );
+
+    const normalizedSearch = normalizeEntityName(name);
+    const match = data.entities?.find(
+      entity => normalizeEntityName(entity.name) === normalizedSearch
+    );
+
+    return match || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch existing relations for a set of entity IDs in a given space.
+ * Returns a Set of dedup keys: "fromEntityId:toEntityId:typeId"
+ */
+export async function fetchExistingRelations(
+  entityIds: string[],
+  spaceId: string,
+  network: 'TESTNET' | 'MAINNET'
+): Promise<Set<string>> {
+  const dedupKeys = new Set<string>();
+
+  if (entityIds.length === 0 || !spaceId) {
+    return dedupKeys;
+  }
+
+  logger.info(`Checking for existing relations in space (dedup)...`);
+
+  // Query outgoing relations for each entity in the target space.
+  // Note: root query is `relations` (not `relationsList` which is an entity field).
+  const RELATIONS_QUERY = `
+    query EntityRelations($entityId: UUID!, $spaceId: UUID!) {
+      relations(filter: { fromEntityId: { is: $entityId }, spaceId: { is: $spaceId } }) {
+        fromEntityId
+        toEntityId
+        typeId
+      }
+    }
+  `;
+
+  const batchSize = 10;
+  for (let i = 0; i < entityIds.length; i += batchSize) {
+    const batch = entityIds.slice(i, i + batchSize);
+
+    const promises = batch.map(entityId =>
+      executeQuery<{
+        relations: Array<{ fromEntityId: string; toEntityId: string; typeId: string }>;
+      }>(RELATIONS_QUERY, { entityId, spaceId }, network).catch(() => ({
+        relations: [] as Array<{ fromEntityId: string; toEntityId: string; typeId: string }>,
+      }))
+    );
+
+    const results = await Promise.all(promises);
+
+    for (const result of results) {
+      for (const rel of result.relations ?? []) {
+        dedupKeys.add(`${rel.fromEntityId}:${rel.toEntityId}:${rel.typeId}`);
+      }
+    }
+  }
+
+  if (dedupKeys.size > 0) {
+    logger.info(`Found ${dedupKeys.size} existing relations in space`);
+  }
+
+  return dedupKeys;
 }
 
 /**

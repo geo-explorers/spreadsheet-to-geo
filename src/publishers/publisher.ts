@@ -5,7 +5,7 @@
  * so we just pass them directly to the SDK's publish functions.
  */
 
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, parseEventLogs } from 'viem';
 import {
   personalSpace,
   daoSpace,
@@ -16,6 +16,55 @@ import {
 import type { Metadata, PublishOptions } from '../config/types.js';
 import type { OperationsBatch, PublishResult } from '../config/upsert-types.js';
 import { logger } from '../utils/logger.js';
+
+// MainVoting event ABI fragment — used to decode proposal info from receipt logs
+const PublishEditsProposalCreatedEvent = {
+  anonymous: false,
+  inputs: [
+    { indexed: true, internalType: 'uint256', name: 'proposalId', type: 'uint256' },
+    { indexed: true, internalType: 'address', name: 'creator', type: 'address' },
+    { indexed: false, internalType: 'uint64', name: 'startDate', type: 'uint64' },
+    { indexed: false, internalType: 'uint64', name: 'endDate', type: 'uint64' },
+    { indexed: false, internalType: 'string', name: 'editsContentUri', type: 'string' },
+    { indexed: false, internalType: 'address', name: 'dao', type: 'address' },
+  ],
+  name: 'PublishEditsProposalCreated',
+  type: 'event',
+} as const;
+
+// SpaceRegistry ABI fragment — used to resolve spaceId → contract address
+const SpaceRegistryAbi = [
+  {
+    inputs: [{ internalType: 'bytes16', name: '_spaceId', type: 'bytes16' }],
+    name: 'spaceIdToAddress',
+    outputs: [{ internalType: 'address', name: '_account', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+const SPACE_REGISTRY_ADDRESS = '0xB01683b2f0d38d43fcD4D9aAB980166988924132' as const;
+
+// DAO Space ABI fragment — used to check caller's role (EDITOR vs MEMBER)
+const DaoSpaceRoleAbi = [
+  {
+    inputs: [],
+    name: 'EDITOR',
+    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: '_role', type: 'bytes32' },
+      { internalType: 'bytes16', name: '_spaceId', type: 'bytes16' },
+    ],
+    name: 'hasRole',
+    outputs: [{ internalType: 'bool', name: '_hasRole', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
 
 // Network configurations
 const NETWORKS = {
@@ -179,11 +228,8 @@ async function publishToPersonalSpace(
 /**
  * Publish to DAO space (create proposal)
  *
- * Note: DAO space publishing requires additional parameters:
- * - DAO_SPACE_ADDRESS: The DAO space contract address
- * - CALLER_SPACE_ID: The proposer's personal space ID
- *
- * These should be provided in environment variables.
+ * Requires CALLER_SPACE_ID in environment variables (proposer's personal space ID).
+ * The DAO space contract address is resolved on-chain from the space ID via SpaceRegistry.
  */
 async function publishToDAOSpace(
   ops: Op[],
@@ -198,26 +244,66 @@ async function publishToDAOSpace(
   const author = metadata.author || walletAddress;
   logger.keyValue('Author', metadata.author ? `${author} (from Metadata tab)` : `${author} (wallet — no author in Metadata)`);
 
-  // DAO space publishing requires additional configuration
-  const daoSpaceAddress = process.env.DAO_SPACE_ADDRESS as `0x${string}` | undefined;
   const callerSpaceId = process.env.CALLER_SPACE_ID as `0x${string}` | undefined;
 
-  if (!daoSpaceAddress || !callerSpaceId) {
+  if (!callerSpaceId) {
     return {
       success: false,
-      error: 'DAO space publishing requires DAO_SPACE_ADDRESS and CALLER_SPACE_ID environment variables',
+      error: 'DAO space publishing requires CALLER_SPACE_ID environment variable (your personal space ID, bytes16 hex)',
     };
   }
 
   try {
-    // Note: SDK currently only supports TESTNET
+    // Resolve DAO space contract address on-chain from space ID
+    const publicClient = createPublicClient({
+      transport: http(NETWORKS[options.network].rpcUrl),
+    });
+
+    const daoSpaceId = `0x${metadata.spaceId}` as `0x${string}`;
+    logger.info('Resolving DAO space contract address from SpaceRegistry...');
+
+    const daoSpaceAddress = await publicClient.readContract({
+      address: SPACE_REGISTRY_ADDRESS,
+      abi: SpaceRegistryAbi,
+      functionName: 'spaceIdToAddress',
+      args: [daoSpaceId],
+    });
+
+    if (!daoSpaceAddress || daoSpaceAddress === '0x0000000000000000000000000000000000000000') {
+      return {
+        success: false,
+        error: `Could not resolve contract address for space ID ${metadata.spaceId} — is it registered on-chain?`,
+      };
+    }
+
+    logger.keyValue('DAO Space Address', daoSpaceAddress);
+
+    // Determine voting mode: EDITORs can use FAST, MEMBERs must use SLOW
+    const editorRole = await publicClient.readContract({
+      address: daoSpaceAddress,
+      abi: DaoSpaceRoleAbi,
+      functionName: 'EDITOR',
+    });
+
+    const isEditor = await publicClient.readContract({
+      address: daoSpaceAddress,
+      abi: DaoSpaceRoleAbi,
+      functionName: 'hasRole',
+      args: [editorRole, callerSpaceId],
+    });
+
+    const votingMode = isEditor ? 'FAST' : 'SLOW';
+    logger.keyValue('Caller Role', isEditor ? 'EDITOR (fast path)' : 'MEMBER (slow path)');
+    logger.keyValue('Voting Mode', votingMode);
+
     const { cid, editId, to, calldata } = await daoSpace.proposeEdit({
       name: `Spreadsheet import - ${new Date().toISOString()}`,
       ops,
       author,
       daoSpaceAddress,
       callerSpaceId,
-      daoSpaceId: metadata.spaceId as `0x${string}`,
+      daoSpaceId,
+      votingMode,
       network: options.network as Network,
     });
 
@@ -227,16 +313,36 @@ async function publishToDAOSpace(
       data: calldata,
     });
 
-    // Wait for confirmation
-    const publicClient = createPublicClient({
-      transport: http(NETWORKS[options.network].rpcUrl),
-    });
-
+    // Wait for confirmation (reuse publicClient from above)
     const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
 
     if (receipt.status === 'success') {
       logger.success('Proposal created successfully!');
       logger.warn('Note: Proposal requires governance vote to execute');
+
+      // Parse receipt logs to extract voting contract address + on-chain proposal ID
+      const proposalEvents = parseEventLogs({
+        abi: [PublishEditsProposalCreatedEvent],
+        logs: receipt.logs,
+      });
+
+      if (proposalEvents.length > 0) {
+        const event = proposalEvents[0];
+        const votingContractAddress = event.address;
+        const onchainProposalId = event.args.proposalId;
+        const startDate = new Date(Number(event.args.startDate) * 1000);
+        const endDate = new Date(Number(event.args.endDate) * 1000);
+
+        logger.section('Proposal Details (save for cancellation)');
+        logger.keyValue('Voting Contract', votingContractAddress);
+        logger.keyValue('On-chain Proposal ID', onchainProposalId.toString());
+        logger.keyValue('Creator', event.args.creator);
+        logger.keyValue('Voting Start', startDate.toISOString());
+        logger.keyValue('Voting End', endDate.toISOString());
+      } else {
+        logger.warn('Could not find PublishEditsProposalCreated event in receipt logs');
+      }
+
       return {
         success: true,
         editId: editId.toString(),
