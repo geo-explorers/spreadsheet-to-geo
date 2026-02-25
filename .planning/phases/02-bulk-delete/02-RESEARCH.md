@@ -1,16 +1,28 @@
 # Phase 2: Bulk Delete - Research
 
 **Researched:** 2026-02-25
-**Domain:** CLI delete pipeline using Geo SDK delete operations + GraphQL entity introspection
+**Domain:** CLI delete pipeline using Geo SDK unset/delete-relation operations + GraphQL entity introspection
 **Confidence:** HIGH
+
+## CRITICAL FINDING: deleteEntity Is Not Implemented
+
+**`Graph.deleteEntity()` is NOT functional.** The SDK method exists and generates ops, but the Geo Indexer ignores `deleteEntity` ops entirely. This was confirmed through real-world testing on testnet (2026-02-25).
+
+**The workaround** (used by the Geo curator app) is:
+1. Delete all relations to/from the entity using `Graph.deleteRelation({ id })` (this WORKS)
+2. Unset all property values using `Graph.updateEntity({ id, unset: [...] })` (this WORKS)
+
+After this, the entity appears blank/empty in the Geo Browser — no name, no properties, no relations, no type badge. This is the de facto "delete" in the Geo protocol.
+
+**Source:** User tested on testnet with a real entity. `Graph.deleteRelation()` successfully removed relations. `Graph.updateEntity({ id, unset })` successfully cleared properties (name, description, custom properties, types).
 
 ## Summary
 
-Phase 2 implements a bulk delete command (`geo-publish delete`) that reads entity IDs from an Excel file, validates they exist, fetches all associated data (properties, relations, backlinks, type assignments), builds SDK delete operations, and publishes them through the existing publish pipeline. The Geo SDK (`@geoprotocol/geo-sdk`, upstream `@graphprotocol/grc-20`) provides `Graph.deleteEntity({ id })` and `Graph.deleteRelation({ id })` that return `Op[]` -- the same `Op` type used by create operations, meaning the entire existing publish infrastructure (wallet init, personal/DAO space publishing, transaction confirmation) can be reused without modification.
+Phase 2 implements a bulk delete command (`geo-publish delete`) that reads entity IDs from an Excel file, validates they exist, fetches all associated data (properties, relations, backlinks) via the GraphQL API, builds SDK operations to blank each entity, and publishes them through the existing publish pipeline. The approach uses `Graph.deleteRelation({ id })` for all relations (outgoing + incoming) and `Graph.updateEntity({ id, unset })` to clear all property values — since `Graph.deleteEntity()` is ignored by the Indexer.
 
-The core technical challenge is the **deletion order**: all triples (property values, outgoing relations, incoming relations/backlinks, type assignment relations) must be removed before the entity itself is deleted. The SDK does not provide a "delete all triples" convenience method -- each relation must be deleted individually using its relation row ID (already available from `fetchEntityDetails()` built in Phase 1). Property value triples are deleted as part of `Graph.deleteEntity()` itself (the entity deletion removes its value triples), but relations are separate entities in the graph and require explicit `Graph.deleteRelation()` calls. The `--space` flag (required by success criteria but absent from the current CLI stub) must be added to supply the space ID, since delete input is a simple ID list without a Metadata tab.
+The core technical challenge is **completeness**: we must discover ALL property IDs and ALL relation IDs (both outgoing and incoming/backlinks) for each entity, then generate ops to remove every one. The GraphQL API at `https://testnet-api.geobrowser.io/graphql` provides entity details including `values` (properties with `propertyId`) and `relations` (with relation `id`). Incoming relations ("Referenced by") must be queried separately via the `backlinks` or equivalent field. The `--space` flag (required by success criteria but absent from the current CLI stub) must be added to supply the space ID, since delete input is a simple ID list without a Metadata tab.
 
-**Primary recommendation:** Build the delete pipeline as a mirror of the upsert pipeline pattern: parse input, validate, fetch details, build ops, confirm, publish. Reuse `fetchEntityDetails()`, `parseEntityIds()`, the publisher, and report infrastructure from Phase 1. The delete command needs a `--space` CLI flag and a `--force` flag (per user decisions).
+**Primary recommendation:** Build the delete pipeline as a mirror of the upsert pipeline pattern: parse input, validate, fetch details, build ops, confirm, publish. Reuse `fetchEntityDetails()`, `parseEntityIds()`, the publisher, and report infrastructure from Phase 1. The delete command needs a `--space` CLI flag and a `--force` flag (per user decisions). **Do NOT use `Graph.deleteEntity()` — use `Graph.updateEntity({ id, unset })` instead.**
 
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
@@ -47,11 +59,11 @@ None -- discussion stayed within phase scope
 |----|-------------|-----------------|
 | DEL-01 | User can provide CSV of entity IDs as delete input | `parseEntityIds()` from Phase 1 reads Excel single-column IDs with validation. Note: despite "CSV" in requirement, actual implementation uses Excel (.xlsx) via the existing parser -- consistent with the rest of the tool. CLI stub already accepts `[file]` argument. |
 | DEL-02 | Tool validates all entity IDs exist before executing any deletions | `fetchEntityDetails()` returns `null` for non-existent entities. Batch-validate all IDs by calling this for each ID; collect nulls as invalid. Fail-fast: reject entire batch if any ID is invalid. |
-| DEL-03 | Tool deletes all property triples for each entity | `Graph.deleteEntity({ id })` handles property triple removal as part of entity deletion. No separate property-deletion step needed. |
+| DEL-03 | Tool deletes all property triples for each entity | **UPDATED:** `Graph.deleteEntity()` is NOT functional (Indexer ignores it). Use `Graph.updateEntity({ id, unset: propertyIds.map(p => ({ property: p })) })` to unset all property values. Property IDs are available from `fetchEntityDetails()` via the `values` connection's `propertyId` field. |
 | DEL-04 | Tool deletes all outgoing relations for each entity | `fetchEntityDetails()` returns `relations[]` with each relation's own `id`. Use `Graph.deleteRelation({ id })` for each. |
 | DEL-05 | Tool deletes all incoming relations (backlinks) for each entity | `fetchEntityDetails()` returns `backlinks[]` with each backlink's own `id`. Use `Graph.deleteRelation({ id })` for each. Backlinks GraphQL field needs runtime verification (flagged in STATE.md). |
-| DEL-06 | Tool deletes type assignment relations for each entity | Type assignments are relations in the graph. `fetchEntityDetails()` returns `typeIds[]` but not the relation row IDs for type assignments. Research finding: type relations may need separate query or may be handled by entity deletion. See Open Questions. |
-| DEL-07 | Tool deletes the entity itself after all triples are removed | `Graph.deleteEntity({ id })` returns `{ id, ops: Op[] }`. Call after all relations are deleted. |
+| DEL-06 | Tool deletes type assignment relations for each entity | Type assignments are relations in the graph. They appear in the `relations` connection and can be deleted via `Graph.deleteRelation({ id })`. User testing confirmed that type badge disappears when the type relation is deleted. |
+| DEL-07 | Tool deletes the entity itself after all triples are removed | **UPDATED:** `Graph.deleteEntity()` is NOT functional (Indexer ignores it). Instead, the entity is "blanked" by unsetting all properties via `Graph.updateEntity({ id, unset })` + deleting all relations via `Graph.deleteRelation()`. The entity shell remains in the graph but has no visible data. |
 | DEL-08 | Dry-run mode shows entity names, property counts, and relation counts without executing | All data available from `fetchEntityDetails()`: name, values.length, relations.length, backlinks.length. Display in table format. |
 | DEL-09 | Pre-operation snapshot saves entity data before deletion as audit trail | Serialize `EntityDetails[]` to JSON in `.snapshots/` with timestamped filename per user decision. |
 | DEL-10 | Progress reporting shows "Processing X/Y..." for batches | Existing `logger.progress()` utility provides progress bar. Use line-by-line logging for entity-level progress. |
@@ -139,8 +151,8 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
 }
 ```
 
-### Pattern 2: Delete Operation Ordering
-**What:** Relations must be deleted before entity, because entities cannot be deleted while relations point to/from them
+### Pattern 2: Delete Operation Ordering (Workaround for Non-Functional deleteEntity)
+**What:** Since `Graph.deleteEntity()` is ignored by the Indexer, "deletion" means: (1) delete all relations, (2) unset all properties. Order: relations first (outgoing + incoming), then property unset.
 **When to use:** Every entity deletion
 **Example:**
 ```typescript
@@ -148,22 +160,28 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
 function buildDeleteOpsForEntity(details: EntityDetails): Op[] {
   const ops: Op[] = [];
 
-  // 1. Delete outgoing relations
+  // 1. Delete outgoing relations (includes type assignments)
   for (const rel of details.relations) {
     const { ops: relOps } = Graph.deleteRelation({ id: rel.id });
     ops.push(...relOps);
   }
 
-  // 2. Delete incoming relations (backlinks)
+  // 2. Delete incoming relations (backlinks / "Referenced by")
   for (const backlink of details.backlinks) {
     const { ops: blOps } = Graph.deleteRelation({ id: backlink.id });
     ops.push(...blOps);
   }
 
-  // 3. Delete the entity itself (handles property triples internally)
-  const { ops: entityOps } = Graph.deleteEntity({ id: details.id });
-  ops.push(...entityOps);
+  // 3. Unset ALL property values (blanks the entity)
+  // Collect all unique property IDs from the entity's values
+  const propertyIds = [...new Set(details.values.map(v => v.propertyId))];
+  const { ops: updateOps } = Graph.updateEntity({
+    id: details.id,
+    unset: propertyIds.map(property => ({ property })),
+  });
+  ops.push(...updateOps);
 
+  // NOTE: Do NOT use Graph.deleteEntity() — Indexer ignores it
   return ops;
 }
 ```
@@ -197,7 +215,7 @@ for (let i = 0; i < entities.length; i++) {
 ```
 
 ### Anti-Patterns to Avoid
-- **Deleting entity before relations:** Graph.deleteEntity() will fail or leave orphaned relation triples if relations still reference the entity
+- **Using `Graph.deleteEntity()`:** The Indexer ignores this op. Use `Graph.updateEntity({ id, unset })` + `Graph.deleteRelation()` instead
 - **Single massive transaction:** Publishing hundreds of delete ops in one transaction may exceed gas limits or timeout. Consider batching if entity count is large, but start with single-transaction for simplicity (user can split input files for very large batches)
 - **Silently skipping non-existent entities:** Requirements say tool must refuse to proceed if ANY ID doesn't exist -- never silently skip
 - **Modifying publisher.ts:** The publisher is operation-agnostic (takes `Op[]`). Delete ops go through the same path. Do not create a separate delete publisher.
@@ -223,11 +241,8 @@ for (let i = 0; i < entities.length; i++) {
 **How to avoid:** Early in implementation, test `fetchEntityDetails()` against a real entity with known backlinks. If the field is missing, fall back to querying `relations` filtered by `toEntityId` to find incoming relations.
 **Warning signs:** GraphQL errors mentioning unknown field `backlinks`, or empty backlinks array for entities that are known to have incoming relations
 
-### Pitfall 2: Type Assignment Relation IDs
-**What goes wrong:** `fetchEntityDetails()` returns `typeIds[]` (the type entity IDs) but may not return the relation row IDs needed to call `Graph.deleteRelation()` for type assignments
-**Why it happens:** Type assignments in the knowledge graph are stored as relations (entity -> type), but the current `ENTITY_DETAILS_QUERY` may not expose them in the `relations` connection -- they could be implicit in `typeIds`
-**How to avoid:** Verify whether `Graph.deleteEntity()` handles type relation cleanup automatically. If not, check if type relations appear in the `relations` connection or need a separate query. The SDK's `deleteEntity` operation likely handles this (it deletes the entity and its direct triples), but this needs verification.
-**Warning signs:** After entity deletion, querying shows orphaned type-assignment triples
+### Pitfall 2: Type Assignment Relation IDs — RESOLVED
+**Status:** User testing confirmed type assignment relations appear in the `relations` connection and can be deleted via `Graph.deleteRelation({ id })`. The type badge disappears after deletion. Ensure `fetchEntityDetails()` query captures type relations in its `relations` connection.
 
 ### Pitfall 3: Duplicate Relation Deletions Across Entities
 **What goes wrong:** Entity A has an outgoing relation to Entity B. When processing Entity A, we delete this relation. When processing Entity B, `backlinks` also lists this same relation. Attempting to delete it again will fail (already deleted).
@@ -255,13 +270,18 @@ for (let i = 0; i < entities.length; i++) {
 
 ## Code Examples
 
-### Delete Entity with SDK
+### "Delete" Entity via Unset (Workaround)
 ```typescript
-// Source: github.com/graphprotocol/grc-20-ts/src/graph/delete-entity.ts
+// Graph.deleteEntity() is NOT functional — Indexer ignores it.
+// Instead, unset all property values to blank the entity.
 import { Graph } from '@geoprotocol/geo-sdk';
 
-const { id, ops } = Graph.deleteEntity({ id: entityId });
-// ops = [{ type: 'deleteEntity', id: '<grc-id>' }]
+// propertyIds = all property IDs from entity's values connection
+const { ops } = Graph.updateEntity({
+  id: entityId,
+  unset: propertyIds.map(property => ({ property })),
+});
+// Entity will appear blank in Geo Browser after this
 ```
 
 ### Delete Relation with SDK
@@ -357,25 +377,25 @@ function writeRemainingCsv(
 
 ## Open Questions
 
-1. **Type Assignment Relation Cleanup**
-   - What we know: `fetchEntityDetails()` returns `typeIds[]` but not individual type-assignment relation row IDs. The `relations` connection may or may not include type assignment relations.
-   - What's unclear: Does `Graph.deleteEntity()` automatically clean up type assignment relations? Or must they be deleted explicitly? If explicit, how to get their relation row IDs?
-   - Recommendation: During implementation, test `Graph.deleteEntity()` on a typed entity and verify whether type assignments are cleaned up. If not, query the `relations` connection filtered by type-assignment relation type (likely `SystemIds.TYPES_PROPERTY` or similar) to get their row IDs.
+1. **Type Assignment Relation Cleanup** — RESOLVED
+   - **Answer:** Type assignments ARE relations. They appear in the entity's `relations` connection with their own relation IDs. `Graph.deleteRelation({ id })` successfully removes type badges. Confirmed by user testing on testnet: deleting the type relation made the "Episode" badge disappear.
 
-2. **Backlinks API Availability**
-   - What we know: The `ENTITY_DETAILS_QUERY` includes a `backlinks` connection. This was built in Phase 1 but flagged as needing runtime verification.
-   - What's unclear: Whether the production Geo API supports the `backlinks` field, and whether it returns complete results (pagination?).
-   - Recommendation: Test early in implementation. If unavailable, incoming relations can be discovered by querying `relations` on entities that reference our target entity -- though this is more expensive.
+2. **Backlinks API Availability** — PARTIALLY RESOLVED
+   - What we know: The GraphQL API supports querying incoming relations. User successfully queried backlinks via the `relationsTo` connection on the entity query. The "Referenced by" section in Geo Browser shows these incoming relations.
+   - What's still unclear: Whether the Phase 1 `fetchEntityDetails()` query includes backlinks or if the query needs updating. The `ENTITY_DETAILS_QUERY` may need to include `relationsTo` (or equivalent) to capture incoming relations.
+   - Recommendation: Verify the existing query covers incoming relations. If not, extend it.
 
 3. **publishToGeo Metadata Shape for Delete**
    - What we know: `publishToGeo()` takes a `Metadata` object that includes `spaceType` ('Personal' | 'DAO'). Delete command gets spaceId from `--space` flag but has no Metadata tab for spaceType.
    - What's unclear: How to determine spaceType from just a space ID.
-   - Recommendation: Either add a `--space-type` flag (simple), auto-detect from API (query space info), or default to 'Personal' with override option. The simplest path is requiring `--space-type` as a flag, matching the upsert pattern where spaceType comes from the Metadata tab.
+   - Recommendation: Either add a `--space-type` flag (simple), auto-detect from API (query space info), or default to 'Personal' with override option.
 
-4. **Relation Junction Entities**
-   - What we know: STATE.md notes "Relation junction entity IDs may need explicit deletion -- verify during implementation"
-   - What's unclear: Whether `Graph.deleteRelation()` automatically cleans up junction entities, or if they need separate deletion
-   - Recommendation: Test during implementation by examining the ops generated by `Graph.deleteRelation()` -- if it only produces a single `deleteRelation` op, junction cleanup may be handled by the protocol layer.
+4. **Relation Junction Entities** — LOW PRIORITY
+   - User testing showed `Graph.deleteRelation()` works correctly — relations disappear from the entity. Junction entity cleanup appears to be handled by the protocol layer. No explicit action needed.
+
+5. **Entity Shell After "Deletion"** — NEW
+   - After unsetting all properties and deleting all relations, the entity ID still exists in the graph — it just has no visible data. This is the expected behavior since `deleteEntity` is non-functional.
+   - This means "deleted" entities may still appear in queries with empty data. The success criteria "querying any deleted entity returns no properties, no relations, and no backlinks" is satisfied — the entity returns empty results.
 
 ## Sources
 
@@ -395,17 +415,23 @@ function writeRemainingCsv(
 - `.planning/STATE.md` -- Blockers: backlinks verification, relation junction IDs
 - `.planning/phases/01-*/01-03-SUMMARY.md` -- Phase 1 decisions: connection pattern, parser pattern
 
-### Tertiary (LOW confidence)
-- Whether `Graph.deleteEntity()` handles type-assignment cleanup (needs runtime verification)
-- Whether backlinks GraphQL field is available in production API (needs runtime verification)
-- Whether relation junction entities need explicit deletion (needs runtime verification)
+### User-Verified (testnet, 2026-02-25)
+- `Graph.deleteEntity()` is NOT functional — Indexer ignores the op (confirmed by Geo team)
+- `Graph.updateEntity({ id, unset })` successfully clears property values
+- `Graph.deleteRelation({ id })` successfully removes relations (outgoing + incoming)
+- Type assignment relations can be deleted via `Graph.deleteRelation()` — type badge disappears
+- GraphQL API at `https://testnet-api.geobrowser.io/graphql` provides entity values, relations, and backlinks
+
+### External References
+- Geo SDK source: https://github.com/geobrowser/geo-sdk/tree/main
+- Geo GraphQL API: https://testnet-api.geobrowser.io/graphql
 
 ## Metadata
 
 **Confidence breakdown:**
 - Standard stack: HIGH -- all libraries already in project, no new dependencies
-- Architecture: HIGH -- follows established upsert.ts pattern; SDK delete APIs confirmed via source
-- Pitfalls: MEDIUM -- three items flagged for runtime verification (backlinks, type assignments, junctions)
+- Architecture: HIGH -- follows established upsert.ts pattern; deleteEntity workaround confirmed via user testing on testnet
+- Pitfalls: HIGH -- most runtime questions resolved by user testing (type assignments, deleteRelation, updateEntity unset all confirmed working)
 
 **Research date:** 2026-02-25
 **Valid until:** 2026-03-25 (stable -- project dependencies pinned, SDK API unlikely to change in 30 days)
