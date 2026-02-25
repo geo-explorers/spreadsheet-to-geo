@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 2 of 3 (Bulk Delete) -- COMPLETE
-Plan: 2 of 2 in current phase (2 complete)
+Plan: 3 of 3 in current phase (3 complete)
 Status: Phase Complete
-Last activity: 2026-02-25 -- Completed 02-02-PLAN.md (delete command handler and CLI wiring)
+Last activity: 2026-02-25 -- Completed 02-03-PLAN.md (CSV parser column fix and space ID from CSV)
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 2.6min
-- Total execution time: 0.22 hours
+- Total plans completed: 6
+- Average duration: 2.7min
+- Total execution time: 0.27 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
-| 02 | 2 | 5min | 2.5min |
+| 02 | 3 | 8min | 2.7min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (2min), 02-01 (3min), 01-02 (3min), 01-03 (2min), 01-01 (3min)
+- Last 5 plans: 02-03 (3min), 02-02 (2min), 02-01 (3min), 01-02 (3min), 01-03 (2min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -43,6 +43,9 @@ Progress: [██████████] 100%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- 02-03: BOM-tolerant getColumnValue helper for CSV header matching (handles UTF-8 BOM prefix)
+- 02-03: CSV is primary source for space ID; --space flag is optional override
+- 02-03: Mismatch between --space flag and CSV space ID exits with explicit error
 - 02-02: OperationsBatch compatibility shim wraps DeleteBatch.ops with zeroed BatchSummary for publishToGeo()
 - 02-02: Default spaceType 'Personal' for v1 delete metadata
 - 02-02: --force replaces --yes for delete command confirmation bypass
@@ -70,5 +73,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 02-02-PLAN.md (delete command handler and CLI wiring) -- Phase 2 complete
-Resume file: .planning/phases/02-bulk-delete/02-02-SUMMARY.md
+Stopped at: Completed 02-03-PLAN.md (CSV parser column fix and space ID from CSV) -- Phase 2 complete
+Resume file: .planning/phases/02-bulk-delete/02-03-SUMMARY.md
