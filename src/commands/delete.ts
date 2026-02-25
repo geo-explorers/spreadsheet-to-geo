@@ -127,7 +127,6 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
 
   logger.section('Geo Publish - Delete');
   logger.keyValue('File', file);
-  logger.keyValue('Space', options.space);
   logger.keyValue('Network', network);
   logger.keyValue('Dry Run', options.dryRun.toString());
   logger.keyValue('Force', options.force.toString());
@@ -145,7 +144,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
 
     // Step b: Parse entity IDs from Excel
     logger.section('Parsing Entity IDs');
-    const { ids, errors: parseErrors } = parseEntityIds(filePath, 'Sheet1');
+    const { ids, spaceId: csvSpaceId, errors: parseErrors } = parseEntityIds(filePath, 'Sheet1');
 
     if (parseErrors.length > 0) {
       logger.error('Entity ID parsing errors:');
@@ -162,6 +161,23 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
 
     logger.success(`Parsed ${ids.length} entity IDs`);
 
+    // Resolve space ID: CLI flag overrides CSV, but conflict = error
+    let spaceId: string;
+    if (options.space && csvSpaceId && options.space !== csvSpaceId) {
+      logger.error(`Space ID mismatch: --space flag "${options.space}" differs from CSV Space ID column "${csvSpaceId}"`);
+      process.exit(1);
+    }
+    if (options.space) {
+      spaceId = options.space;
+    } else if (csvSpaceId) {
+      spaceId = csvSpaceId;
+    } else {
+      logger.error('No space ID found. Provide --space flag or include a "Space ID" column in the CSV.');
+      process.exit(1);
+    }
+
+    logger.keyValue('Space', spaceId);
+
     // Step c: Validate ALL entity IDs exist (fail-fast: DEL-02)
     logger.section('Validating Entities');
     const entityDetailsList: EntityDetails[] = [];
@@ -171,7 +187,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
       const results = await Promise.all(
-        batch.map((id) => fetchEntityDetails(id, options.space, network))
+        batch.map((id) => fetchEntityDetails(id, spaceId, network))
       );
 
       for (let j = 0; j < batch.length; j++) {
@@ -188,7 +204,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
     }
 
     if (invalidIds.length > 0) {
-      logger.error(`${invalidIds.length} entity ID(s) not found in space ${options.space}:`);
+      logger.error(`${invalidIds.length} entity ID(s) not found in space ${spaceId}:`);
       for (const id of invalidIds) {
         logger.listItem(id);
       }
@@ -219,7 +235,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
         timestamp: new Date().toISOString(),
         success: true,
         network,
-        spaceId: options.space,
+        spaceId: spaceId,
         dryRun: true,
         summary: {
           entitiesDeleted: entityDetailsList.length,
@@ -280,7 +296,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
     logger.section('Publishing Delete Operations');
 
     const metadata: Metadata = {
-      spaceId: options.space,
+      spaceId: spaceId,
       spaceType: 'Personal',
     };
 
@@ -321,7 +337,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
       timestamp: new Date().toISOString(),
       success: true,
       network,
-      spaceId: options.space,
+      spaceId: spaceId,
       dryRun: false,
       transactionHash: result.transactionHash,
       summary: {

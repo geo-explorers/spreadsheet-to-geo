@@ -41,14 +41,14 @@ const deleteCmd = program
   .command('delete')
   .argument('[file]', 'Path to Excel (.xlsx) file with entity IDs')
   .description('Delete entities listed in an Excel file')
-  .requiredOption('-s, --space <id>', 'Target space ID (32-char hex)')
+  .option('-s, --space <id>', 'Override space ID from CSV (32-char hex)')
   .option('-n, --network <network>', 'Network to publish to (TESTNET or MAINNET)')
   .option('--dry-run', 'Preview deletions without executing', false)
   .option('-f, --force', 'Skip confirmation prompt (for CI/scripts)', false)
   .option('-o, --output <dir>', 'Output directory for reports', './reports')
   .option('-v, --verbose', 'Enable verbose logging', false)
   .action(async (file?: string, opts?: {
-    space: string;
+    space?: string;
     network?: string;
     dryRun: boolean;
     force: boolean;
@@ -61,7 +61,7 @@ const deleteCmd = program
     }
     const { deleteCommand } = await import('./commands/delete.js');
     await deleteCommand(file, {
-      space: opts!.space,
+      space: opts?.space,
       network: opts?.network,
       dryRun: opts!.dryRun,
       force: opts!.force,
