@@ -45,12 +45,11 @@ Plans:
   3. Tool refuses to proceed if any entity ID in the CSV does not exist, reporting which IDs are invalid
   4. After deletion, querying any deleted entity returns no properties, no relations, and no backlinks
   5. Summary report displays counts of entities deleted, relations removed, and properties unset
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md -- Delete types and operation builder (wave 1)
+- [ ] 02-02-PLAN.md -- Delete command handler and CLI wiring (wave 2, depends on 02-01)
 
 ### Phase 3: Bulk Update
 **Goal**: Engineers can bulk-update entity properties from an Excel spreadsheet, overwriting existing values and unsetting cleared cells, using the same spreadsheet format as upsert plus an entity ID column
@@ -76,5 +75,5 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
-| 2. Bulk Delete | 0/3 | Not started | - |
+| 2. Bulk Delete | 0/2 | Not started | - |
 | 3. Bulk Update | 0/2 | Not started | - |
