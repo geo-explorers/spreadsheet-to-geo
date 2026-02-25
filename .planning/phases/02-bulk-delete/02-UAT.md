@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 02-bulk-delete
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md]
 started: 2026-02-25T12:00:00Z
-updated: 2026-02-25T12:20:00Z
+updated: 2026-02-25T14:45:00Z
 ---
 
 ## Current Test
@@ -49,7 +49,7 @@ skipped: 2
 ## Gaps
 
 - truth: "Parser reads Entity ID from correct CSV column and Space ID from Space ID column"
-  status: failed
+  status: resolved
   reason: "User reported: Parser reads column 1 (Space ID) as entity ID. User decision: read space from CSV, drop --space as required flag."
   severity: blocker
   test: 2
@@ -70,7 +70,7 @@ skipped: 2
   debug_session: ".planning/debug/csv-parser-column-order.md"
 
 - truth: "Delete command correctly parses entity IDs from user-provided CSV"
-  status: failed
+  status: resolved
   reason: "User reported: Parsed space ID ad4bd3902613b19081fd65db609588ee as entity ID instead of actual entity ID 673736370ab644b28cd2ac34e5c18cfd"
   severity: blocker
   test: 4
