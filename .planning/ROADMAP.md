@@ -13,7 +13,7 @@ Transform the existing upsert-only CLI into a multi-operation tool supporting bu
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: CLI Restructure and Shared Infrastructure** - Extract monolithic index.ts into subcommand CLI with shared modules, CSV parser, entity detail queries, and generalized reporting
-- [ ] **Phase 2: Bulk Delete** - Complete delete pipeline: CSV input, entity validation, triple removal (properties, relations, backlinks, types), entity deletion, dry-run, reporting
+- [x] **Phase 2: Bulk Delete** - Complete delete pipeline: CSV input, entity validation, triple removal (properties, relations, backlinks, types), entity deletion, dry-run, reporting (completed 2026-02-25)
 - [ ] **Phase 3: Bulk Update** - Complete update pipeline: Excel input with entity ID column, property overwrite via updateEntity, unset for cleared cells, dry-run, reporting
 
 ## Phase Details
@@ -75,5 +75,5 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
-| 2. Bulk Delete | 1/2 | In Progress | - |
+| 2. Bulk Delete | 1/2 | Complete    | 2026-02-25 |
 | 3. Bulk Update | 0/2 | Not started | - |
