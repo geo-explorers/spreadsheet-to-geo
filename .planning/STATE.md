@@ -9,29 +9,29 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 
 ## Current Position
 
-Phase: 2 of 3 (Bulk Delete)
-Plan: 1 of 2 in current phase (1 complete)
-Status: In Progress
-Last activity: 2026-02-25 -- Completed 02-01-PLAN.md (delete operation builder)
+Phase: 2 of 3 (Bulk Delete) -- COMPLETE
+Plan: 2 of 2 in current phase (2 complete)
+Status: Phase Complete
+Last activity: 2026-02-25 -- Completed 02-02-PLAN.md (delete command handler and CLI wiring)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 2.8min
-- Total execution time: 0.18 hours
+- Total plans completed: 5
+- Average duration: 2.6min
+- Total execution time: 0.22 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
-| 02 | 1 | 3min | 3min |
+| 02 | 2 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (3min), 01-02 (3min), 01-03 (2min), 01-01 (3min)
+- Last 5 plans: 02-02 (2min), 02-01 (3min), 01-02 (3min), 01-03 (2min), 01-01 (3min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -43,6 +43,9 @@ Progress: [█████░░░░░] 50%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- 02-02: OperationsBatch compatibility shim wraps DeleteBatch.ops with zeroed BatchSummary for publishToGeo()
+- 02-02: Default spaceType 'Personal' for v1 delete metadata
+- 02-02: --force replaces --yes for delete command confirmation bypass
 - 02-01: Graph.deleteEntity() intentionally excluded -- Indexer ignores it; use updateEntity+unset and deleteRelation instead
 - 02-01: Relation ID deduplication via Set<string> to handle overlapping outgoing/backlink relations across entities
 - 02-01: DeleteBatch mirrors OperationsBatch from upsert: { ops: Op[], summary }
@@ -67,5 +70,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Completed 02-01-PLAN.md (delete operation builder)
-Resume file: .planning/phases/02-bulk-delete/02-01-SUMMARY.md
+Stopped at: Completed 02-02-PLAN.md (delete command handler and CLI wiring) -- Phase 2 complete
+Resume file: .planning/phases/02-bulk-delete/02-02-SUMMARY.md
