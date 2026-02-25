@@ -48,7 +48,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Delete types and operation builder (wave 1)
+- [x] 02-01-PLAN.md -- Delete types and operation builder (wave 1)
 - [ ] 02-02-PLAN.md -- Delete command handler and CLI wiring (wave 2, depends on 02-01)
 
 ### Phase 3: Bulk Update
@@ -75,5 +75,5 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
-| 2. Bulk Delete | 0/2 | Not started | - |
+| 2. Bulk Delete | 1/2 | In Progress | - |
 | 3. Bulk Update | 0/2 | Not started | - |
