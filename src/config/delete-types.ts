@@ -10,7 +10,7 @@ import type { Op } from '@geoprotocol/geo-sdk';
 /** Options for the delete command (parsed from CLI flags) */
 export interface DeleteOptions {
   network?: string;
-  space: string; // Required --space flag (32-char hex)
+  space?: string; // Optional --space flag (CSV is primary source)
   dryRun: boolean;
   output: string; // Report output directory
   verbose: boolean;
