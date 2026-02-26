@@ -29,17 +29,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Delete Operation
 
-- [ ] **DEL-01**: User can provide CSV of entity IDs as delete input
-- [ ] **DEL-02**: Tool validates all entity IDs exist before executing any deletions
-- [ ] **DEL-03**: Tool deletes all property triples for each entity
-- [ ] **DEL-04**: Tool deletes all outgoing relations for each entity
-- [ ] **DEL-05**: Tool deletes all incoming relations (backlinks) for each entity
-- [ ] **DEL-06**: Tool deletes type assignment relations for each entity
-- [ ] **DEL-07**: Tool deletes the entity itself after all triples are removed
-- [ ] **DEL-08**: Dry-run mode shows entity names, property counts, and relation counts without executing
-- [ ] **DEL-09**: Pre-operation snapshot saves entity data before deletion as audit trail
-- [ ] **DEL-10**: Progress reporting shows "Processing X/Y..." for batches
-- [ ] **DEL-11**: Summary report shows counts of entities deleted, relations removed, properties unset
+- [x] **DEL-01**: User can provide CSV of entity IDs as delete input
+- [x] **DEL-02**: Tool validates all entity IDs exist before executing any deletions
+- [x] **DEL-03**: Tool deletes all property triples for each entity
+- [x] **DEL-04**: Tool deletes all outgoing relations for each entity
+- [x] **DEL-05**: Tool deletes all incoming relations (backlinks) for each entity
+- [x] **DEL-06**: Tool deletes type assignment relations for each entity
+- [x] **DEL-07**: Tool deletes the entity itself after all triples are removed
+- [x] **DEL-08**: Dry-run mode shows entity names, property counts, and relation counts without executing
+- [x] **DEL-09**: Pre-operation snapshot saves entity data before deletion as audit trail
+- [x] **DEL-10**: Progress reporting shows "Processing X/Y..." for batches
+- [x] **DEL-11**: Summary report shows counts of entities deleted, relations removed, properties unset
 
 ### Update Operation
 
@@ -100,17 +100,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 1 | Complete |
-| DEL-01 | Phase 2 | Pending |
-| DEL-02 | Phase 2 | Pending |
-| DEL-03 | Phase 2 | Pending |
-| DEL-04 | Phase 2 | Pending |
-| DEL-05 | Phase 2 | Pending |
-| DEL-06 | Phase 2 | Pending |
-| DEL-07 | Phase 2 | Pending |
-| DEL-08 | Phase 2 | Pending |
-| DEL-09 | Phase 2 | Pending |
-| DEL-10 | Phase 2 | Pending |
-| DEL-11 | Phase 2 | Pending |
+| DEL-01 | Phase 2 | Complete |
+| DEL-02 | Phase 2 | Complete |
+| DEL-03 | Phase 2 | Complete |
+| DEL-04 | Phase 2 | Complete |
+| DEL-05 | Phase 2 | Complete |
+| DEL-06 | Phase 2 | Complete |
+| DEL-07 | Phase 2 | Complete |
+| DEL-08 | Phase 2 | Complete |
+| DEL-09 | Phase 2 | Complete |
+| DEL-10 | Phase 2 | Complete |
+| DEL-11 | Phase 2 | Complete |
 | UPD-01 | Phase 3 | Pending |
 | UPD-02 | Phase 3 | Pending |
 | UPD-03 | Phase 3 | Pending |

@@ -36,23 +36,41 @@ program
     await upsertCommand(file, opts);
   });
 
-// Delete subcommand (stub for Phase 2)
+// Delete subcommand
 const deleteCmd = program
   .command('delete')
   .argument('[file]', 'Path to Excel (.xlsx) file with entity IDs')
   .description('Delete entities listed in an Excel file')
+  .option('-s, --space <id>', 'Override space ID from CSV (32-char hex)')
+  .option('-a, --author <id>', 'Author ID for publish operations (32-char hex)')
   .option('-n, --network <network>', 'Network to publish to (TESTNET or MAINNET)')
-  .option('--dry-run', 'Validate and preview without deleting', false)
+  .option('--dry-run', 'Preview deletions without executing', false)
+  .option('-f, --force', 'Skip confirmation prompt (for CI/scripts)', false)
   .option('-o, --output <dir>', 'Output directory for reports', './reports')
   .option('-v, --verbose', 'Enable verbose logging', false)
-  .option('-y, --yes', 'Skip confirmation prompt', false)
-  .action(async (file?: string) => {
+  .action(async (file?: string, opts?: {
+    space?: string;
+    author?: string;
+    network?: string;
+    dryRun: boolean;
+    force: boolean;
+    output: string;
+    verbose: boolean;
+  }) => {
     if (!file) {
       deleteCmd.help();
       return;
     }
-    console.error('Delete command is not yet implemented. Coming in Phase 2.');
-    process.exit(1);
+    const { deleteCommand } = await import('./commands/delete.js');
+    await deleteCommand(file, {
+      space: opts?.space,
+      author: opts?.author,
+      network: opts?.network,
+      dryRun: opts!.dryRun,
+      force: opts!.force,
+      output: opts!.output,
+      verbose: opts!.verbose,
+    });
   });
 
 // Update subcommand (stub for Phase 3)

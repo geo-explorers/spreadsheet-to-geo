@@ -13,7 +13,7 @@ Transform the existing upsert-only CLI into a multi-operation tool supporting bu
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: CLI Restructure and Shared Infrastructure** - Extract monolithic index.ts into subcommand CLI with shared modules, CSV parser, entity detail queries, and generalized reporting
-- [ ] **Phase 2: Bulk Delete** - Complete delete pipeline: CSV input, entity validation, triple removal (properties, relations, backlinks, types), entity deletion, dry-run, reporting
+- [x] **Phase 2: Bulk Delete** - Complete delete pipeline: CSV input, entity validation, triple removal (properties, relations, backlinks, types), entity deletion, dry-run, reporting
 - [ ] **Phase 3: Bulk Update** - Complete update pipeline: Excel input with entity ID column, property overwrite via updateEntity, unset for cleared cells, dry-run, reporting
 
 ## Phase Details
@@ -40,17 +40,17 @@ Plans:
 **Depends on**: Phase 1
 **Requirements**: DEL-01, DEL-02, DEL-03, DEL-04, DEL-05, DEL-06, DEL-07, DEL-08, DEL-09, DEL-10, DEL-11
 **Success Criteria** (what must be TRUE):
-  1. Running `geo-publish delete entities.csv --space <id>` deletes all listed entities and their associated triples from the space
+  1. Running `geo-publish delete entities.csv` reads space ID from CSV and deletes all listed entities and their associated triples
   2. Running with `--dry-run` shows entity names, property counts, and relation counts for each entity without executing any deletions
   3. Tool refuses to proceed if any entity ID in the CSV does not exist, reporting which IDs are invalid
   4. After deletion, querying any deleted entity returns no properties, no relations, and no backlinks
   5. Summary report displays counts of entities deleted, relations removed, and properties unset
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [x] 02-01-PLAN.md -- Delete types and operation builder (wave 1)
+- [x] 02-02-PLAN.md -- Delete command handler and CLI wiring (wave 2, depends on 02-01)
+- [x] 02-03-PLAN.md -- Fix CSV column parsing and space ID sourcing from CSV (gap closure)
 
 ### Phase 3: Bulk Update
 **Goal**: Engineers can bulk-update entity properties from an Excel spreadsheet, overwriting existing values and unsetting cleared cells, using the same spreadsheet format as upsert plus an entity ID column
@@ -76,5 +76,5 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
-| 2. Bulk Delete | 0/3 | Not started | - |
+| 2. Bulk Delete | 3/3 | Complete    | 2026-02-25 |
 | 3. Bulk Update | 0/2 | Not started | - |
