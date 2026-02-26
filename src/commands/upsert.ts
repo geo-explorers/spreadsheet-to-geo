@@ -72,6 +72,13 @@ export async function upsertCommand(file: string, options: UpsertOptions): Promi
     logger.section('Parsing Spreadsheet');
     const data = parseExcelFile(filePath);
 
+    // Check operation type field
+    if (data.metadata.operationType && data.metadata.operationType.toUpperCase() !== 'UPSERT') {
+      logger.warn(
+        `Spreadsheet Operation type is '${data.metadata.operationType}' but running upsert command. Proceeding.`
+      );
+    }
+
     // Validate data
     logger.section('Validating Data');
     const validation = validateSpreadsheet(data);
