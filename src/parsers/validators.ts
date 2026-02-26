@@ -117,6 +117,7 @@ function validateProperties(data: ParsedSpreadsheet, errors: ValidationError[]):
     'BOOLEAN',
     'RELATION',
     'POINT',
+    'SCHEDULE',
   ];
 
   for (let i = 0; i < data.properties.length; i++) {

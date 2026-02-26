@@ -195,6 +195,9 @@ function parseMetadataTab(workbook: XLSX.WorkBook): Metadata {
       case 'readyforpublishing':
         metadata.readyForPublishing = boolValue;
         break;
+      case 'operationtype':
+        metadata.operationType = value;
+        break;
     }
   }
 

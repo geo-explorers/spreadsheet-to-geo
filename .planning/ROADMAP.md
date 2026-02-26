@@ -53,19 +53,34 @@ Plans:
 - [ ] 02-03: TBD
 
 ### Phase 3: Bulk Update
-**Goal**: Engineers can bulk-update entity properties from an Excel spreadsheet, overwriting existing values and unsetting cleared cells, using the same spreadsheet format as upsert plus an entity ID column
-**Depends on**: Phase 1 (entity detail queries for validation); Phase 2 not required
+**Goal**: Curators can bulk-update entity properties from an Excel spreadsheet
+using the same template format as upsert, with `Operation type: UPDATE` in the
+Metadata tab. Only filled cells are applied — blank cells are skipped entirely.
+The script resolves entities by name, queries their current state from Geo,
+diffs provided values against live data, and writes only what has changed.
+**Depends on**: Phase 1 (entity detail queries for current-state resolution)
 **Requirements**: UPD-01, UPD-02, UPD-03, UPD-04, UPD-05, UPD-06
 **Success Criteria** (what must be TRUE):
-  1. Running `geo-publish update spreadsheet.xlsx --space <id>` overwrites property values for all listed entities
-  2. Cells explicitly cleared in the spreadsheet result in those properties being unset (removed) on the entity
-  3. Running with `--dry-run` shows per-entity diffs: which properties will be set and which will be unset
-  4. Tool refuses to proceed if any entity ID in the spreadsheet does not exist, reporting which IDs are invalid
-**Plans**: TBD
+  1. Running `geo-publish update spreadsheet.xlsx --space <id>` applies only the
+     non-blank cells in each row, leaving all other properties on the entity untouched
+  2. For scalar properties (TEXT, DATE, BOOL etc.), a filled cell overwrites the
+     current value on the entity
+  3. For relation properties, the filled cell expresses the desired final state
+     (comma-separated list); the script diffs against existing relations and emits
+     add ops for new targets and remove ops for dropped targets
+  4. Blank cells are always skipped — there is no mechanism to unset a property
+     via a blank cell; unsetting is out of scope for this phase
+  5. If an entity name is not found in the space the tool hard-errors on that row,
+     reports which names failed to resolve, and does not apply any changes from
+     the batch
+  6. Running with `--dry-run` prints a per-entity diff: which scalar values will
+     be overwritten (old → new), which relation targets will be added, and which
+     will be removed — without writing anything to Geo
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md -- Update infrastructure: shared CLI helpers, update types, diff engine (wave 1)
+- [ ] 03-02-PLAN.md -- Update command pipeline, CLI wiring, report generation (wave 2)
 
 ## Progress
 
@@ -77,4 +92,4 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 |-------|----------------|--------|-----------|
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
 | 2. Bulk Delete | 0/3 | Not started | - |
-| 3. Bulk Update | 0/2 | Not started | - |
+| 3. Bulk Update | 0/2 | Planned | - |

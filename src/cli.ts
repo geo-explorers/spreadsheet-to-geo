@@ -55,23 +55,33 @@ const deleteCmd = program
     process.exit(1);
   });
 
-// Update subcommand (stub for Phase 3)
+// Update subcommand
 const updateCmd = program
   .command('update')
   .argument('[file]', 'Path to Excel (.xlsx) file with entity updates')
   .description('Update entity properties from an Excel spreadsheet')
   .option('-n, --network <network>', 'Network to publish to (TESTNET or MAINNET)')
-  .option('--dry-run', 'Validate and preview without updating', false)
+  .option('--dry-run', 'Validate, diff, and preview without publishing', false)
   .option('-o, --output <dir>', 'Output directory for reports', './reports')
-  .option('-v, --verbose', 'Enable verbose logging', false)
+  .option('-v, --verbose', 'Show unchanged relation targets in diff output', false)
+  .option('-q, --quiet', 'Suppress diff and progress, only show errors and summary', false)
   .option('-y, --yes', 'Skip confirmation prompt', false)
+  .option('--additive', 'Only add new relation targets, never remove existing ones', false)
   .action(async (file?: string) => {
     if (!file) {
       updateCmd.help();
       return;
     }
-    console.error('Update command is not yet implemented. Coming in Phase 3.');
-    process.exit(1);
+    const { updateCommand } = await import('./commands/update.js');
+    await updateCommand(file, {
+      network: updateCmd.opts().network,
+      dryRun: updateCmd.opts().dryRun,
+      output: updateCmd.opts().output,
+      verbose: updateCmd.opts().verbose,
+      quiet: updateCmd.opts().quiet,
+      yes: updateCmd.opts().yes,
+      additive: updateCmd.opts().additive,
+    });
   });
 
 program.parse();

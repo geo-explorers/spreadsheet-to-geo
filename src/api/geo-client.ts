@@ -55,7 +55,10 @@ export interface EntityDetails {
     propertyId: string;
     text: string | null;
     boolean: boolean | null;
+    integer: number | null;
     float: number | null;
+    date: string | null;
+    time: string | null;
     datetime: string | null;
     point: string | null;
     schedule: string | null;
@@ -122,7 +125,10 @@ const ENTITY_DETAILS_QUERY = `
         propertyId
         text
         boolean
+        integer
         float
+        date
+        time
         datetime
         point
         schedule
@@ -242,7 +248,8 @@ async function executeQuery<T>(
 export async function searchEntityByName(
   name: string,
   spaceId: string | null,
-  network: 'TESTNET' | 'MAINNET'
+  network: 'TESTNET' | 'MAINNET',
+  expectedTypes?: string[]
 ): Promise<GeoEntity | null> {
   try {
     const data = await executeQuery<{ search: GeoEntity[] }>(
@@ -253,11 +260,23 @@ export async function searchEntityByName(
 
     // Filter for exact name match (case-insensitive)
     const normalizedSearch = normalizeEntityName(name);
-    const match = data.search?.find(
+    const exactMatches = data.search?.filter(
       entity => normalizeEntityName(entity.name) === normalizedSearch
-    );
+    ) ?? [];
 
-    return match || null;
+    if (exactMatches.length === 0) return null;
+
+    // When expected types are provided, prefer a result whose type matches
+    if (expectedTypes && expectedTypes.length > 0 && exactMatches.length > 1) {
+      const normalizedExpected = expectedTypes.map(t => normalizeEntityName(t));
+      const typeMatch = exactMatches.find(entity =>
+        entity.types.some(t => normalizedExpected.includes(normalizeEntityName(t.name)))
+      );
+      if (typeMatch) return typeMatch;
+    }
+
+    // Fall back to first exact match (original behavior)
+    return exactMatches[0];
   } catch (error) {
     logger.warn(`Failed to search for entity "${name}"`, {
       error: error instanceof Error ? error.message : String(error),
@@ -273,7 +292,8 @@ export async function searchEntityByName(
 export async function searchEntitiesByNames(
   names: string[],
   targetSpaceId: string,
-  network: 'TESTNET' | 'MAINNET'
+  network: 'TESTNET' | 'MAINNET',
+  typeHints?: Map<string, string[]>
 ): Promise<Map<string, GeoEntity>> {
   const results = new Map<string, GeoEntity>();
 
@@ -301,11 +321,13 @@ export async function searchEntitiesByNames(
     const batch = names.slice(i, i + batchSize);
 
     // Always search Root space; only search target space if ID is valid
-    const searchPromises = batch.flatMap(name =>
-      isValidTargetSpace
-        ? [searchEntityByName(name, ROOT_SPACE_ID, network), searchEntityByName(name, targetSpaceId, network)]
-        : [searchEntityByName(name, ROOT_SPACE_ID, network)]
-    );
+    const searchPromises = batch.flatMap(name => {
+      const normalized = normalizeEntityName(name);
+      const expectedTypes = typeHints?.get(normalized);
+      return isValidTargetSpace
+        ? [searchEntityByName(name, ROOT_SPACE_ID, network, expectedTypes), searchEntityByName(name, targetSpaceId, network, expectedTypes)]
+        : [searchEntityByName(name, ROOT_SPACE_ID, network, expectedTypes)];
+    });
 
     const searchResults = await Promise.all(searchPromises);
 
@@ -377,11 +399,12 @@ export async function searchTypesByNames(
 
 /**
  * Search for properties by names
- * Properties are typically in the Root space
+ * Searches Root space first, then target space for custom properties
  */
 export async function searchPropertiesByNames(
   names: string[],
-  network: 'TESTNET' | 'MAINNET'
+  network: 'TESTNET' | 'MAINNET',
+  targetSpaceId?: string
 ): Promise<Map<string, GeoProperty>> {
   const results = new Map<string, GeoProperty>();
 
@@ -391,16 +414,29 @@ export async function searchPropertiesByNames(
 
   logger.info(`Searching for ${names.length} properties in Geo...`);
 
-  // Step 1: Search property names in parallel batches
+  const isValidTargetSpace =
+    !!targetSpaceId &&
+    targetSpaceId !== 'placeholder_space_id_for_dry_run' &&
+    /^[0-9a-f]{32}$/i.test(targetSpaceId);
+
+  // Step 1: Search property names in parallel batches (Root + target space)
   const batchSize = 20;
   for (let i = 0; i < names.length; i += batchSize) {
     const batch = names.slice(i, i + batchSize);
-    const searchResults = await Promise.all(
-      batch.map(name => searchEntityByName(name, ROOT_SPACE_ID, network))
+    const searchPromises = batch.flatMap(name =>
+      isValidTargetSpace
+        ? [searchEntityByName(name, ROOT_SPACE_ID, network), searchEntityByName(name, targetSpaceId, network)]
+        : [searchEntityByName(name, ROOT_SPACE_ID, network)]
     );
 
+    const searchResults = await Promise.all(searchPromises);
+
+    const stride = isValidTargetSpace ? 2 : 1;
     for (let j = 0; j < batch.length; j++) {
-      const entity = searchResults[j];
+      const rootResult = searchResults[j * stride];
+      const targetResult = isValidTargetSpace ? searchResults[j * stride + 1] : null;
+      // Prefer target space result (custom property), fall back to root
+      const entity = targetResult || rootResult;
       if (entity) {
         results.set(normalizeEntityName(batch[j]), {
           id: entity.id,

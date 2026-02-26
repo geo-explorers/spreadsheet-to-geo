@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Editors can fix data quality issues at scale through standardized spreadsheet-driven bulk operations
-**Current focus:** Phase 1: CLI Restructure and Shared Infrastructure
+**Current focus:** Phase 3: Bulk Update
 
 ## Current Position
 
-Phase: 1 of 3 (CLI Restructure and Shared Infrastructure)
-Plan: 3 of 3 in current phase (all complete)
-Status: Phase 1 Complete
-Last activity: 2026-02-22 -- Completed 01-02-PLAN.md (shared types and report infrastructure)
+Phase: 3 of 3 (Bulk Update)
+Plan: 2 of 2 in current phase (complete)
+Status: Phase Complete
+Last activity: 2026-02-24 -- Completed 03-02-PLAN.md (update command handler and reporting)
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 2.7min
-- Total execution time: 0.13 hours
+- Total plans completed: 5
+- Average duration: 2.6min
+- Total execution time: 0.22 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
+| 03 | 2 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (3min), 01-03 (2min), 01-01 (3min)
+- Last 5 plans: 03-02 (2min), 03-01 (3min), 01-02 (3min), 01-03 (2min), 01-01 (3min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -50,6 +51,10 @@ Recent decisions affecting current work:
 - 01-02: Report naming convention: {operation}-{timestamp}.json with optional -dryrun suffix
 - [Phase 01]: CLI router uses dynamic import for command handlers to keep startup fast
 - [Phase 01]: Network resolution precedence: --network flag > GEO_NETWORK env var > TESTNET default
+- 03-01: Re-implemented convertToTypedValue in update-diff.ts rather than extracting from batch-builder.ts to avoid coupling update pipeline to upsert internals
+- 03-01: Canonical value normalization for diff comparison (both spreadsheet and API values normalized before comparing) to avoid false diffs
+- 03-02: Minimal BatchSummary adapter with zeroed upsert-specific fields to satisfy publishToGeo's OperationsBatch type, avoiding publisher interface refactor
+- 03-02: All update ops (updateEntity + createRelation + deleteRelation) collected into single flat Op[] array for atomic publish
 
 ### Pending Todos
 
@@ -62,6 +67,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-22
-Stopped at: Completed 01-02-PLAN.md (shared types and report infrastructure) -- Phase 1 complete
-Resume file: .planning/phases/01-cli-restructure-and-shared-infrastructure/01-02-SUMMARY.md
+Last session: 2026-02-24
+Stopped at: Completed 03-02-PLAN.md (update command handler and reporting) -- Phase 3 complete
+Resume file: .planning/phases/03-bulk-update/03-02-SUMMARY.md
