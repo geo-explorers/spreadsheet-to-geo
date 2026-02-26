@@ -17,10 +17,9 @@
 
 import { fetchEntityDetails } from '../api/geo-client.js';
 import type { EntityDetails } from '../api/geo-client.js';
-import { normalizeEntityName, parseDate, parseDatetime, parseTime } from '../utils/cell-parsers.js';
+import { normalizeEntityName, parseDate, parseDatetime, parseTime, convertToTypedValue } from '../utils/cell-parsers.js';
 import type { PropertyDiff, RelationDiff, EntityDiff, DiffSummary } from '../config/update-types.js';
-import type { PropertyDefinition } from '../config/upsert-types.js';
-import type { TypedValue } from '@geoprotocol/geo-sdk';
+import { SystemIds } from '@geoprotocol/geo-sdk';
 import { logger } from '../utils/logger.js';
 
 // ============================================================================
@@ -145,10 +144,25 @@ export function diffEntity(
     // Skip blank cells -- blank = "no opinion", not "unset" (UPD-04)
     if (!value || value.trim() === '') continue;
 
-    // Skip description -- handled separately in entity creation, not a diff target
-    if (normalizeEntityName(propertyName) === 'description') continue;
-
     const normalizedPropName = normalizeEntityName(propertyName);
+
+    // Description is a system property — diff it using DESCRIPTION_PROPERTY ID
+    if (normalizedPropName === 'description') {
+      const descDiff = diffScalarProperty(
+        'Description',
+        SystemIds.DESCRIPTION_PROPERTY,
+        value,
+        details.values,
+        'TEXT'
+      );
+      if (descDiff.type === 'set') {
+        scalarChanges.push(descDiff);
+      } else {
+        unchangedScalarCount++;
+      }
+      continue;
+    }
+
     const propDef = propertyDefs.get(normalizedPropName);
     if (!propDef) {
       if (options.verbose) {
@@ -418,15 +432,19 @@ function getCurrentValueAsString(
     case 'BOOLEAN':
       return match.boolean !== null ? String(match.boolean) : null;
     case 'INTEGER':
+      return match.integer !== null ? String(match.integer) : null;
     case 'FLOAT':
       return match.float !== null ? String(match.float) : null;
     case 'DATE':
+      return match.date;
+    case 'TIME':
+      return match.time;
     case 'DATETIME':
       return match.datetime;
-    case 'TIME':
-      return match.datetime; // Time stored as datetime in API
     case 'POINT':
       return match.point;
+    case 'SCHEDULE':
+      return match.schedule;
     default:
       return match.text;
   }
@@ -507,65 +525,3 @@ function valuesAreEqual(a: string, b: string, dataType: string): boolean {
   return a === b;
 }
 
-/**
- * Convert spreadsheet value to SDK TypedValue format.
- * Same logic as batch-builder.ts convertToTypedValue, re-implemented here
- * to avoid coupling to the upsert pipeline's internal function.
- */
-function convertToTypedValue(
-  value: string,
-  dataType: string
-): TypedValue | undefined {
-  switch (dataType) {
-    case 'TEXT':
-      return { type: 'text', value };
-
-    case 'INTEGER': {
-      const intVal = parseInt(value, 10);
-      if (isNaN(intVal)) return undefined;
-      return { type: 'integer', value: intVal };
-    }
-
-    case 'FLOAT': {
-      const floatVal = Number.parseFloat(value);
-      if (isNaN(floatVal)) return undefined;
-      return { type: 'float', value: floatVal };
-    }
-
-    case 'DATE': {
-      const dateVal = parseDate(value);
-      if (!dateVal) return undefined;
-      return { type: 'date', value: dateVal };
-    }
-
-    case 'TIME': {
-      const timeVal = parseTime(value);
-      if (!timeVal) return undefined;
-      return { type: 'time', value: timeVal };
-    }
-
-    case 'DATETIME': {
-      const datetimeVal = parseDatetime(value);
-      if (!datetimeVal) return undefined;
-      return { type: 'datetime', value: datetimeVal };
-    }
-
-    case 'BOOLEAN': {
-      const lower = value.toLowerCase();
-      if (['true', 'yes', 'y', '1'].includes(lower)) return { type: 'boolean', value: true };
-      if (['false', 'no', 'n', '0'].includes(lower)) return { type: 'boolean', value: false };
-      return undefined;
-    }
-
-    case 'POINT': {
-      const parts = value.split(',').map(p => Number.parseFloat(p.trim()));
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        return { type: 'point', lat: parts[0], lon: parts[1] };
-      }
-      return undefined;
-    }
-
-    default:
-      return { type: 'text', value };
-  }
-}
