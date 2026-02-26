@@ -46,7 +46,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **UPD-01**: User can provide Excel spreadsheet in same format as upsert, plus entity ID column
 - [x] **UPD-02**: Tool validates all entity IDs exist before executing updates
 - [x] **UPD-03**: Tool overwrites existing property values using `updateEntity` set semantics
-- [x] **UPD-04**: Tool unsets properties for explicitly cleared/empty cells
+- [x] **UPD-04**: Tool skips blank cells (no unset — blank = "no opinion", per CONTEXT.md design decision)
 - [x] **UPD-05**: Dry-run mode shows what properties will be changed per entity
 - [x] **UPD-06**: Summary report shows counts of entities updated, properties set, properties unset
 
