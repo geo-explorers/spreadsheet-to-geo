@@ -17,7 +17,7 @@ import { parseExcelFile, checkRequiredTabs } from '../parsers/excel-parser.js';
 import { validateSpreadsheet, formatValidationErrors } from '../parsers/validators.js';
 import { searchEntitiesByNames, searchPropertiesByNames } from '../api/geo-client.js';
 import { computeEntityDiffs } from '../processors/update-diff.js';
-import { Graph, type Op } from '@geoprotocol/geo-sdk';
+import { Graph, SystemIds, type Op } from '@geoprotocol/geo-sdk';
 import { resolveNetwork, confirmAction } from '../utils/cli-helpers.js';
 import {
   generateUpdateReport,
@@ -26,7 +26,7 @@ import {
 } from '../publishers/update-report.js';
 import { saveOperationReport } from '../publishers/report.js';
 import { validatePrivateKey, publishToGeo } from '../publishers/publisher.js';
-import { normalizeEntityName, parseMultiValueList } from '../utils/cell-parsers.js';
+import { normalizeEntityName } from '../utils/cell-parsers.js';
 import { logger, setVerbose } from '../utils/logger.js';
 import type { PublishOptions } from '../config/types.js';
 import type { OperationsBatch, BatchSummary } from '../config/upsert-types.js';
@@ -180,7 +180,7 @@ export async function updateCommand(file: string, options: UpdateCommandOptions)
 
     // Resolve property names + IDs (needed for diff engine to match property IDs)
     const propertyNames = data.properties.map(p => p.name);
-    const resolvedGeoProperties = await searchPropertiesByNames(propertyNames, network);
+    const resolvedGeoProperties = await searchPropertiesByNames(propertyNames, network, metadata.spaceId);
 
     // Build resolved-properties map: normalized name -> { id, dataType }
     // Combine spreadsheet PropertyDefinition with API-resolved property info
@@ -276,19 +276,24 @@ export async function updateCommand(file: string, options: UpdateCommandOptions)
 
       // Scalar property updates
       if (entityDiff.scalarChanges.length > 0) {
+        // Separate description from regular property values
+        const descChange = entityDiff.scalarChanges.find(
+          c => c.propertyId === SystemIds.DESCRIPTION_PROPERTY
+        );
         const values = entityDiff.scalarChanges
-          .filter(c => c.typedValue)
+          .filter(c => c.typedValue && c.propertyId !== SystemIds.DESCRIPTION_PROPERTY)
           .map(c => ({
             property: c.propertyId,
             ...c.typedValue!,
           }));
 
-        if (values.length > 0) {
+        if (values.length > 0 || descChange) {
           allOps.push(
-            Graph.updateEntity({
+            ...Graph.updateEntity({
               id: entityDiff.entityId,
-              values,
-            })
+              values: values.length > 0 ? values : undefined,
+              ...(descChange && { description: descChange.newValue }),
+            }).ops
           );
         }
       }
@@ -297,20 +302,20 @@ export async function updateCommand(file: string, options: UpdateCommandOptions)
       for (const relDiff of entityDiff.relationChanges) {
         for (const rel of relDiff.toAdd) {
           allOps.push(
-            Graph.createRelation({
+            ...Graph.createRelation({
               fromEntity: entityDiff.entityId,
               toEntity: rel.entityId,
               type: relDiff.propertyId,
-            })
+            }).ops
           );
         }
 
         // Relation removals
         for (const rel of relDiff.toRemove) {
           allOps.push(
-            Graph.deleteRelation({
+            ...Graph.deleteRelation({
               id: rel.relationId,
-            })
+            }).ops
           );
         }
       }
