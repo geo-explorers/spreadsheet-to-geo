@@ -11,6 +11,7 @@ import type { Op } from '@geoprotocol/geo-sdk';
 export interface DeleteOptions {
   network?: string;
   space?: string; // Optional --space flag (CSV is primary source)
+  author?: string; // Optional --author flag for publish operations
   dryRun: boolean;
   output: string; // Report output directory
   verbose: boolean;

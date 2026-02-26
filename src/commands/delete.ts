@@ -298,6 +298,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
     const metadata: Metadata = {
       spaceId: spaceId,
       spaceType: 'Personal',
+      author: options.author,
     };
 
     // Create OperationsBatch-compatible object for the publisher
