@@ -144,7 +144,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
 
     // Step b: Parse entity IDs from Excel
     logger.section('Parsing Entity IDs');
-    const { ids, spaceId: csvSpaceId, errors: parseErrors } = parseEntityIds(filePath, 'Sheet1');
+    const { ids, spaceId: csvSpaceId, errors: parseErrors } = parseEntityIds(filePath, 'Entities to delete');
 
     if (parseErrors.length > 0) {
       logger.error('Entity ID parsing errors:');
@@ -268,6 +268,12 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
     logger.keyValue('Properties to unset', deleteBatch.summary.propertiesToUnset);
     logger.keyValue('Total operations', deleteBatch.ops.length);
 
+    if (deleteBatch.ops.length === 0) {
+      logger.warn('No operations to publish — entities have no properties, relations, or backlinks to remove.');
+      logger.info('These entities may already be blank or were never populated.');
+      process.exit(0);
+    }
+
     // Step g: Confirm deletion (unless --force)
     if (!options.force) {
       const confirmed = await confirmDeletion(entityDetailsList);
@@ -381,7 +387,7 @@ export async function deleteCommand(file: string, options: DeleteOptions): Promi
     // All entity IDs that were parsed but may not have been processed
     try {
       const filePath = path.resolve(file);
-      const { ids } = parseEntityIds(filePath, 'Sheet1');
+      const { ids } = parseEntityIds(filePath, 'Entities to delete');
       if (ids.length > 0) {
         writeRemainingCsv(ids, options.output);
       }
