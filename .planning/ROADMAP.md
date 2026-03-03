@@ -129,7 +129,7 @@ Entity A was published first, so it survives. Its description stays. Related top
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Merge types and Excel parser extension (wave 1)
+- [x] 04-01-PLAN.md -- Merge types and Excel parser extension (wave 1)
 - [ ] 04-02-PLAN.md -- Merge diff engine with conflict detection (wave 2, depends on 04-01)
 - [ ] 04-03-PLAN.md -- Merge command handler, CLI wiring, reporting (wave 3, depends on 04-01, 04-02)
 
@@ -144,4 +144,4 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
 | 2. Bulk Delete | 0/3 | Complete | - |
 | 3. Bulk Update | 0/2 | Complete | - |
-| 4. Bulk Merge  | 0/3 | Planned | - |
+| 4. Bulk Merge  | 1/3 | In Progress | - |

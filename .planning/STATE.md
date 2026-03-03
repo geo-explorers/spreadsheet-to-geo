@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Editors can fix data quality issues at scale through standardized spreadsheet-driven bulk operations
-**Current focus:** Phase 3: Bulk Update
+**Current focus:** Phase 4: Bulk Merge
 
 ## Current Position
 
-Phase: 3 of 3 (Bulk Update)
-Plan: 2 of 2 in current phase (complete)
-Status: Phase Complete
-Last activity: 2026-02-24 -- Completed 03-02-PLAN.md (update command handler and reporting)
+Phase: 4 of 4 (Bulk Merge)
+Plan: 1 of 3 in current phase (complete)
+Status: In Progress
+Last activity: 2026-03-03 -- Completed 04-01-PLAN.md (merge types and parser)
 
-Progress: [██████████] 100%
+Progress: [██████████ ██--------] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 2.6min
-- Total execution time: 0.22 hours
+- Total plans completed: 6
+- Average duration: 2.5min
+- Total execution time: 0.25 hours
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 03 | 2 | 5min | 2.5min |
+| 04 | 1 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (2min), 03-01 (3min), 01-02 (3min), 01-03 (2min), 01-01 (3min)
+- Last 5 plans: 04-01 (2min), 03-02 (2min), 03-01 (3min), 01-02 (3min), 01-03 (2min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -43,6 +44,9 @@ Progress: [██████████] 100%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- 04-01: Merge parser uses local getColumnValue BOM-tolerant helper (self-contained pattern matching entity-id-parser.ts)
+- 04-01: cleanString from cell-parsers.js for whitespace trimming in merge parser
+- 04-01: Same-entity pair validation uses case-insensitive comparison
 - 02-03: BOM-tolerant getColumnValue helper for CSV header matching (handles UTF-8 BOM prefix)
 - 02-03: CSV is primary source for space ID; --space flag is optional override
 - 02-03: Mismatch between --space flag and CSV space ID exits with explicit error
@@ -76,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Completed 03-02-PLAN.md (update command handler and reporting) -- Phase 3 complete
-Resume file: .planning/phases/03-bulk-update/03-02-SUMMARY.md
+Last session: 2026-03-03
+Stopped at: Completed 04-01-PLAN.md (merge types and parser)
+Resume file: .planning/phases/04-bulk-merge/04-01-SUMMARY.md
