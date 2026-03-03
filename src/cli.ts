@@ -102,4 +102,29 @@ const updateCmd = program
     });
   });
 
+// Merge subcommand
+const mergeCmd = program
+  .command('merge')
+  .argument('[file]', 'Path to Excel (.xlsx) file with merge pairs')
+  .description('Merge duplicate entities from an Excel template')
+  .option('-n, --network <network>', 'Network to publish to (TESTNET or MAINNET)')
+  .option('--dry-run', 'Preview merge operations without executing', false)
+  .option('-o, --output <dir>', 'Output directory for reports', './reports')
+  .option('-v, --verbose', 'Show skipped relations and additional detail', false)
+  .option('-y, --yes', 'Skip confirmation prompt', false)
+  .action(async (file?: string) => {
+    if (!file) {
+      mergeCmd.help();
+      return;
+    }
+    const { mergeCommand } = await import('./commands/merge.js');
+    await mergeCommand(file, {
+      network: mergeCmd.opts().network,
+      dryRun: mergeCmd.opts().dryRun,
+      output: mergeCmd.opts().output,
+      verbose: mergeCmd.opts().verbose,
+      yes: mergeCmd.opts().yes,
+    });
+  });
+
 program.parse();
