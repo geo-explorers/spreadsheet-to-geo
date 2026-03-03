@@ -409,8 +409,9 @@ function parseEntityTab(
           pointsToTypes.includes('location');
 
         if (isLocationProperty) {
-          // Don't split location values - keep as single entity name
-          entity.relations[colName] = [value.trim()];
+          // Location values may contain commas (e.g. "Washington, D.C.")
+          // so only split on semicolons, not commas
+          entity.relations[colName] = parseSemicolonList(value);
         } else {
           // Parse as semicolon or comma-separated entity names
           entity.relations[colName] = parseMultiValueList(value);

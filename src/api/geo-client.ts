@@ -267,15 +267,17 @@ export async function searchEntityByName(
     if (exactMatches.length === 0) return null;
 
     // When expected types are provided, prefer a result whose type matches
-    if (expectedTypes && expectedTypes.length > 0 && exactMatches.length > 1) {
+    if (expectedTypes && expectedTypes.length > 0) {
       const normalizedExpected = expectedTypes.map(t => normalizeEntityName(t));
       const typeMatch = exactMatches.find(entity =>
         entity.types.some(t => normalizedExpected.includes(normalizeEntityName(t.name)))
       );
       if (typeMatch) return typeMatch;
+      // No match with correct type — return null rather than wrong-typed entity
+      return null;
     }
 
-    // Fall back to first exact match (original behavior)
+    // Fall back to first exact match when no expectedTypes filter
     return exactMatches[0];
   } catch (error) {
     logger.warn(`Failed to search for entity "${name}"`, {
@@ -359,11 +361,13 @@ export async function searchEntitiesByNames(
 
 /**
  * Search for types by names
- * Types are typically in the Root space
+ * Searches both Root space and target space, prefers target space.
+ * Filters results to only match entities that are actually typed as "Type".
  */
 export async function searchTypesByNames(
   names: string[],
-  network: 'TESTNET' | 'MAINNET'
+  network: 'TESTNET' | 'MAINNET',
+  targetSpaceId?: string
 ): Promise<Map<string, GeoType>> {
   const results = new Map<string, GeoType>();
 
@@ -373,20 +377,36 @@ export async function searchTypesByNames(
 
   logger.info(`Searching for ${names.length} types in Geo...`);
 
-  // Search types in parallel batches (same pattern as entities)
+  const isValidTargetSpace =
+    !!targetSpaceId &&
+    targetSpaceId !== 'placeholder_space_id_for_dry_run' &&
+    /^[0-9a-f]{32}$/i.test(targetSpaceId);
+
+  // Search types in parallel batches — Root + target space
+  // Pass expectedTypes=['Type'] so searchEntityByName only returns Type-typed entities
+  const typeFilter = ['Type'];
   const batchSize = 20;
   for (let i = 0; i < names.length; i += batchSize) {
     const batch = names.slice(i, i + batchSize);
-    const searchResults = await Promise.all(
-      batch.map(name => searchEntityByName(name, ROOT_SPACE_ID, network))
+    const searchPromises = batch.flatMap(name =>
+      isValidTargetSpace
+        ? [searchEntityByName(name, ROOT_SPACE_ID, network, typeFilter), searchEntityByName(name, targetSpaceId, network, typeFilter)]
+        : [searchEntityByName(name, ROOT_SPACE_ID, network, typeFilter)]
     );
 
+    const searchResults = await Promise.all(searchPromises);
+
+    const stride = isValidTargetSpace ? 2 : 1;
     for (let j = 0; j < batch.length; j++) {
-      const entity = searchResults[j];
-      if (entity) {
+      const rootResult = searchResults[j * stride];
+      const targetResult = isValidTargetSpace ? searchResults[j * stride + 1] : null;
+
+      // Prefer target space match over root
+      const chosen = targetResult || rootResult;
+      if (chosen) {
         results.set(normalizeEntityName(batch[j]), {
-          id: entity.id,
-          name: entity.name,
+          id: chosen.id,
+          name: chosen.name,
         });
       }
     }
@@ -420,13 +440,15 @@ export async function searchPropertiesByNames(
     /^[0-9a-f]{32}$/i.test(targetSpaceId);
 
   // Step 1: Search property names in parallel batches (Root + target space)
+  // Pass expectedTypes=['Property'] so searchEntityByName only returns Property-typed entities
+  const propFilter = ['Property'];
   const batchSize = 20;
   for (let i = 0; i < names.length; i += batchSize) {
     const batch = names.slice(i, i + batchSize);
     const searchPromises = batch.flatMap(name =>
       isValidTargetSpace
-        ? [searchEntityByName(name, ROOT_SPACE_ID, network), searchEntityByName(name, targetSpaceId, network)]
-        : [searchEntityByName(name, ROOT_SPACE_ID, network)]
+        ? [searchEntityByName(name, ROOT_SPACE_ID, network, propFilter), searchEntityByName(name, targetSpaceId, network, propFilter)]
+        : [searchEntityByName(name, ROOT_SPACE_ID, network, propFilter)]
     );
 
     const searchResults = await Promise.all(searchPromises);
@@ -435,6 +457,7 @@ export async function searchPropertiesByNames(
     for (let j = 0; j < batch.length; j++) {
       const rootResult = searchResults[j * stride];
       const targetResult = isValidTargetSpace ? searchResults[j * stride + 1] : null;
+
       // Prefer target space result (custom property), fall back to root
       const entity = targetResult || rootResult;
       if (entity) {
