@@ -43,6 +43,15 @@ Progress: [██████████] 100%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- 02-03: BOM-tolerant getColumnValue helper for CSV header matching (handles UTF-8 BOM prefix)
+- 02-03: CSV is primary source for space ID; --space flag is optional override
+- 02-03: Mismatch between --space flag and CSV space ID exits with explicit error
+- 02-02: OperationsBatch compatibility shim wraps DeleteBatch.ops with zeroed BatchSummary for publishToGeo()
+- 02-02: Default spaceType 'Personal' for v1 delete metadata
+- 02-02: --force replaces --yes for delete command confirmation bypass
+- 02-01: Graph.deleteEntity() intentionally excluded -- Indexer ignores it; use updateEntity+unset and deleteRelation instead
+- 02-01: Relation ID deduplication via Set<string> to handle overlapping outgoing/backlink relations across entities
+- 02-01: DeleteBatch mirrors OperationsBatch from upsert: { ops: Op[], summary }
 - Roadmap: 3 phases (restructure, delete, update). Merge deferred to v2.
 - Roadmap: Phases 2 and 3 are independent after Phase 1 (parallelizable).
 - 01-03: Used relations connection pattern (not relationsList) to expose relation row IDs needed for deleteRelation()
