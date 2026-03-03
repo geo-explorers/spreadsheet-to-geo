@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 4 of 4 (Bulk Merge)
-Plan: 1 of 3 in current phase (complete)
+Plan: 2 of 3 in current phase (complete)
 Status: In Progress
-Last activity: 2026-03-03 -- Completed 04-01-PLAN.md (merge types and parser)
+Last activity: 2026-03-03 -- Completed 04-02-PLAN.md (merge diff engine)
 
-Progress: [██████████ ██--------] 60%
+Progress: [██████████ ████------] 70%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 2.5min
-- Total execution time: 0.25 hours
+- Total plans completed: 7
+- Average duration: 2.6min
+- Total execution time: 0.3 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [██████████ ██--------] 60%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 03 | 2 | 5min | 2.5min |
-| 04 | 1 | 2min | 2min |
+| 04 | 2 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01 (2min), 03-02 (2min), 03-01 (3min), 01-02 (3min), 01-03 (2min)
+- Last 5 plans: 04-02 (3min), 04-01 (2min), 03-02 (2min), 03-01 (3min), 01-02 (3min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -44,6 +44,9 @@ Progress: [██████████ ██--------] 60%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- 04-02: TypedValue extraction uses actual SDK types (lowercase: text, boolean, integer, float) with native JS types, not plan description uppercase types
+- 04-02: Schedule properties skipped in merge transfer (not representable as simple TypedValue)
+- 04-02: Property names in MergePairDiff use propertyId as fallback when human-readable name unavailable
 - 04-01: Merge parser uses local getColumnValue BOM-tolerant helper (self-contained pattern matching entity-id-parser.ts)
 - 04-01: cleanString from cell-parsers.js for whitespace trimming in merge parser
 - 04-01: Same-entity pair validation uses case-insensitive comparison
@@ -81,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 04-01-PLAN.md (merge types and parser)
-Resume file: .planning/phases/04-bulk-merge/04-01-SUMMARY.md
+Stopped at: Completed 04-02-PLAN.md (merge diff engine)
+Resume file: .planning/phases/04-bulk-merge/04-02-SUMMARY.md
