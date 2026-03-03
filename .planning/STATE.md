@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 4 of 4 (Bulk Merge)
-Plan: 2 of 3 in current phase (complete)
-Status: In Progress
-Last activity: 2026-03-03 -- Completed 04-02-PLAN.md (merge diff engine)
+Plan: 3 of 3 in current phase (complete)
+Status: Complete
+Last activity: 2026-03-03 -- Completed 04-03-PLAN.md (merge command handler)
 
-Progress: [██████████ ████------] 70%
+Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 2.6min
-- Total execution time: 0.3 hours
+- Total plans completed: 8
+- Average duration: 2.8min
+- Total execution time: 0.4 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [██████████ ████------] 70%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 03 | 2 | 5min | 2.5min |
-| 04 | 2 | 5min | 2.5min |
+| 04 | 3 | 9min | 3.0min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (3min), 04-01 (2min), 03-02 (2min), 03-01 (3min), 01-02 (3min)
+- Last 5 plans: 04-03 (4min), 04-02 (3min), 04-01 (2min), 03-02 (2min), 03-01 (3min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -44,6 +44,9 @@ Progress: [██████████ ████------] 70%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- 04-03: Per-pair atomic publishing: each merge pair is a separate publishToGeo() call, matching MERGE-06 and CONTEXT.md locked decision
+- 04-03: Publish failures logged but do not abort remaining pairs (already-published pairs are committed on-chain)
+- 04-03: Pre-merge snapshot saves both keeper and merger entity states to .snapshots/ for recovery
 - 04-02: TypedValue extraction uses actual SDK types (lowercase: text, boolean, integer, float) with native JS types, not plan description uppercase types
 - 04-02: Schedule properties skipped in merge transfer (not representable as simple TypedValue)
 - 04-02: Property names in MergePairDiff use propertyId as fallback when human-readable name unavailable
@@ -84,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 04-02-PLAN.md (merge diff engine)
-Resume file: .planning/phases/04-bulk-merge/04-02-SUMMARY.md
+Stopped at: Completed 04-03-PLAN.md (merge command handler) -- Phase 4 complete
+Resume file: .planning/phases/04-bulk-merge/04-03-SUMMARY.md

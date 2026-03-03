@@ -59,7 +59,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **MERGE-04**: Tool re-points relations from merger to keeper
 - [x] **MERGE-05**: Tool deletes merger entity after transfer (using delete logic)
 - [x] **MERGE-06**: All ops for a merge pair published in single atomic transaction
-- [ ] **MERGE-07**: Dry-run mode shows property transfers, relation re-points, and conflicts
+- [x] **MERGE-07**: Dry-run mode shows property transfers, relation re-points, and conflicts
 - [x] **MERGE-08**: Merge conflict detection logs when keeper already has a value merger also has
 - [x] **MERGE-09**: Summary report shows properties transferred, relations re-pointed, mergers deleted
 
@@ -125,7 +125,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MERGE-04 | Phase 4 | Complete |
 | MERGE-05 | Phase 4 | Complete |
 | MERGE-06 | Phase 4 | Complete |
-| MERGE-07 | Phase 4 | Pending |
+| MERGE-07 | Phase 4 | Complete |
 | MERGE-08 | Phase 4 | Complete |
 | MERGE-09 | Phase 4 | Complete |
 

@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: CLI Restructure and Shared Infrastructure** - Extract monolithic index.ts into subcommand CLI with shared modules, CSV parser, entity detail queries, and generalized reporting
 - [x] **Phase 2: Bulk Delete** - Complete delete pipeline: CSV input, entity validation, triple removal (properties, relations, backlinks, types), entity deletion, dry-run, reporting
 - [x] **Phase 3: Bulk Update** - Complete update pipeline: Excel input with entity ID column, property overwrite via updateEntity, unset for cleared cells, dry-run, reporting
-- [] **Phase 4: Bulk Merge** -  Complete merge pipeline: CSV input with survivor_id/duplicate_id pairs, entity validation, unique property and relation transfer from duplicates onto survivor (no overwrite of existing survivor values), duplicate entity deletion via standard delete sequence, dry-run showing what will be transferred and deleted, conflict reporting for duplicate properties, summary reporting
+- [x] **Phase 4: Bulk Merge** -  Complete merge pipeline: CSV input with survivor_id/duplicate_id pairs, entity validation, unique property and relation transfer from duplicates onto survivor (no overwrite of existing survivor values), duplicate entity deletion via standard delete sequence, dry-run showing what will be transferred and deleted, conflict reporting for duplicate properties, summary reporting
 
 ## Phase Details
 
@@ -130,8 +130,8 @@ Entity A was published first, so it survives. Its description stays. Related top
 
 Plans:
 - [x] 04-01-PLAN.md -- Merge types and Excel parser extension (wave 1)
-- [ ] 04-02-PLAN.md -- Merge diff engine with conflict detection (wave 2, depends on 04-01)
-- [ ] 04-03-PLAN.md -- Merge command handler, CLI wiring, reporting (wave 3, depends on 04-01, 04-02)
+- [x] 04-02-PLAN.md -- Merge diff engine with conflict detection (wave 2, depends on 04-01)
+- [x] 04-03-PLAN.md -- Merge command handler, CLI wiring, reporting (wave 3, depends on 04-01, 04-02)
 
 ## Progress
 
@@ -144,4 +144,4 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
 | 2. Bulk Delete | 0/3 | Complete | - |
 | 3. Bulk Update | 0/2 | Complete | - |
-| 4. Bulk Merge  | 1/3 | In Progress | - |
+| 4. Bulk Merge  | 3/3 | Complete | 2026-03-03 |
