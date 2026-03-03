@@ -166,7 +166,32 @@ export interface UpdateReport extends ReportBase {
 }
 
 /**
+ * Merge operation report - captures details of a bulk entity merge (Phase 4).
+ */
+export interface MergeReport extends ReportBase {
+  operationType: 'merge';
+  summary: {
+    pairsMerged: number;
+    propertiesTransferred: number;
+    relationsRepointed: number;
+    conflictsSkipped: number;
+    mergersDeleted: number;
+  };
+  details: {
+    pairs: Array<{
+      keeperName: string;
+      keeperId: string;
+      mergerName: string;
+      mergerId: string;
+      propertiesTransferred: number;
+      relationsRepointed: number;
+      conflicts: number;
+    }>;
+  };
+}
+
+/**
  * Discriminated union of all operation reports.
  * Use `report.operationType` to narrow the type.
  */
-export type OperationReport = UpsertReport | DeleteReport | UpdateReport;
+export type OperationReport = UpsertReport | DeleteReport | UpdateReport | MergeReport;
