@@ -3,6 +3,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import type { TypedValue } from '@geoprotocol/geo-sdk';
 
 /**
  * Parse semicolon-separated values from a cell
@@ -343,4 +344,69 @@ export function isEmpty(value: unknown): boolean {
   }
 
   return false;
+}
+
+/**
+ * Convert a spreadsheet string value to SDK TypedValue format.
+ * Shared by both the upsert (batch-builder) and update (diff) pipelines.
+ */
+export function convertToTypedValue(
+  value: string,
+  dataType: string
+): TypedValue | undefined {
+  switch (dataType) {
+    case 'TEXT':
+      return { type: 'text', value };
+
+    case 'INTEGER': {
+      const intVal = parseInt(value, 10);
+      if (isNaN(intVal)) return undefined;
+      return { type: 'integer', value: intVal };
+    }
+
+    case 'FLOAT': {
+      const floatVal = Number.parseFloat(value);
+      if (isNaN(floatVal)) return undefined;
+      return { type: 'float', value: floatVal };
+    }
+
+    case 'DATE': {
+      const dateVal = parseDate(value);
+      if (!dateVal) return undefined;
+      return { type: 'date', value: dateVal };
+    }
+
+    case 'TIME': {
+      const timeVal = parseTime(value);
+      if (!timeVal) return undefined;
+      return { type: 'time', value: timeVal };
+    }
+
+    case 'DATETIME': {
+      const datetimeVal = parseDatetime(value);
+      if (!datetimeVal) return undefined;
+      return { type: 'datetime', value: datetimeVal };
+    }
+
+    case 'BOOLEAN': {
+      const lower = value.toLowerCase();
+      if (['true', 'yes', 'y', '1'].includes(lower)) return { type: 'boolean', value: true };
+      if (['false', 'no', 'n', '0'].includes(lower)) return { type: 'boolean', value: false };
+      return undefined;
+    }
+
+    case 'POINT': {
+      const parts = value.split(',').map(p => Number.parseFloat(p.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        return { type: 'point', lat: parts[0], lon: parts[1] };
+      }
+      return undefined;
+    }
+
+    case 'SCHEDULE':
+      return { type: 'schedule', value };
+
+    default:
+      return { type: 'text', value };
+  }
 }

@@ -57,11 +57,18 @@ export async function buildEntityMap(
   const allPropertyNames = data.properties.map(p => p.name);
   logger.info(`Found ${allPropertyNames.length} property definitions`);
 
-  // 4. Query Geo API for existing entities, types, and properties
+  // 4. Build type hints: normalized entity name -> expected types from spreadsheet
+  const typeHints = new Map<string, string[]>();
+  for (const entity of data.entities) {
+    const normalized = normalizeEntityName(entity.name);
+    typeHints.set(normalized, entity.types);
+  }
+
+  // 5. Query Geo API for existing entities, types, and properties
   logger.subsection('Querying Geo API');
 
   const [existingEntities, existingTypes, existingProperties] = await Promise.all([
-    searchEntitiesByNames(Array.from(allEntityNames), data.metadata.spaceId, network),
+    searchEntitiesByNames(Array.from(allEntityNames), data.metadata.spaceId, network, typeHints),
     searchTypesByNames(allTypeNames, network),
     searchPropertiesByNames(allPropertyNames, network),
   ]);

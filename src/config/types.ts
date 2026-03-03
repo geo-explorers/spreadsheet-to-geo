@@ -23,6 +23,7 @@ export interface Metadata {
   publishDate?: string;
   notes?: string;
   readyForPublishing?: boolean;
+  operationType?: string; // "UPSERT", "UPDATE", etc. -- from Metadata tab
 }
 
 // ============================================================================

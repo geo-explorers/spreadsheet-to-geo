@@ -43,12 +43,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Update Operation
 
-- [ ] **UPD-01**: User can provide Excel spreadsheet in same format as upsert, plus entity ID column
-- [ ] **UPD-02**: Tool validates all entity IDs exist before executing updates
-- [ ] **UPD-03**: Tool overwrites existing property values using `updateEntity` set semantics
-- [ ] **UPD-04**: Tool unsets properties for explicitly cleared/empty cells
-- [ ] **UPD-05**: Dry-run mode shows what properties will be changed per entity
-- [ ] **UPD-06**: Summary report shows counts of entities updated, properties set, properties unset
+- [x] **UPD-01**: User can provide Excel spreadsheet in same format as upsert, plus entity ID column
+- [x] **UPD-02**: Tool validates all entity IDs exist before executing updates
+- [x] **UPD-03**: Tool overwrites existing property values using `updateEntity` set semantics
+- [x] **UPD-04**: Tool skips blank cells (no unset — blank = "no opinion", per CONTEXT.md design decision)
+- [x] **UPD-05**: Dry-run mode shows what properties will be changed per entity
+- [x] **UPD-06**: Summary report shows counts of entities updated, properties set, properties unset
 
 ## v2 Requirements
 
@@ -100,23 +100,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 1 | Complete |
-| DEL-01 | Phase 2 | Complete |
-| DEL-02 | Phase 2 | Complete |
-| DEL-03 | Phase 2 | Complete |
-| DEL-04 | Phase 2 | Complete |
-| DEL-05 | Phase 2 | Complete |
-| DEL-06 | Phase 2 | Complete |
-| DEL-07 | Phase 2 | Complete |
-| DEL-08 | Phase 2 | Complete |
-| DEL-09 | Phase 2 | Complete |
-| DEL-10 | Phase 2 | Complete |
-| DEL-11 | Phase 2 | Complete |
-| UPD-01 | Phase 3 | Pending |
-| UPD-02 | Phase 3 | Pending |
-| UPD-03 | Phase 3 | Pending |
-| UPD-04 | Phase 3 | Pending |
-| UPD-05 | Phase 3 | Pending |
-| UPD-06 | Phase 3 | Pending |
+| DEL-01 | Phase 2 | Pending |
+| DEL-02 | Phase 2 | Pending |
+| DEL-03 | Phase 2 | Pending |
+| DEL-04 | Phase 2 | Pending |
+| DEL-05 | Phase 2 | Pending |
+| DEL-06 | Phase 2 | Pending |
+| DEL-07 | Phase 2 | Pending |
+| DEL-08 | Phase 2 | Pending |
+| DEL-09 | Phase 2 | Pending |
+| DEL-10 | Phase 2 | Pending |
+| DEL-11 | Phase 2 | Pending |
+| UPD-01 | Phase 3 | Complete |
+| UPD-02 | Phase 3 | Complete |
+| UPD-03 | Phase 3 | Complete |
+| UPD-04 | Phase 3 | Complete |
+| UPD-05 | Phase 3 | Complete |
+| UPD-06 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 28 total

@@ -12,7 +12,6 @@ import {
   ContentIds,
   type Op,
   type DataType,
-  type TypedValue,
   type PropertyValueParam,
   type Network,
 } from '@geoprotocol/geo-sdk';
@@ -24,7 +23,7 @@ import type {
   PropertyDefinition,
 } from '../config/upsert-types.js';
 import type { RelationToCreate } from './relation-builder.js';
-import { normalizeEntityName, parseDate, parseTime, parseDatetime, parseMultiValueList } from '../utils/cell-parsers.js';
+import { normalizeEntityName, parseMultiValueList, convertToTypedValue } from '../utils/cell-parsers.js';
 import { logger } from '../utils/logger.js';
 
 /** Maps normalized entity name → { avatarImageId?, coverImageId? } */
@@ -470,68 +469,6 @@ function buildPropertyValues(
   }
 
   return values;
-}
-
-/**
- * Convert spreadsheet value to SDK TypedValue format
- */
-function convertToTypedValue(
-  value: string,
-  dataType: PropertyDefinition['dataType']
-): TypedValue | undefined {
-  switch (dataType) {
-    case 'TEXT':
-      return { type: 'text', value };
-
-    case 'INTEGER': {
-      const intVal = parseInt(value, 10);
-      if (isNaN(intVal)) return undefined;
-      return { type: 'integer', value: intVal };
-    }
-
-    case 'FLOAT': {
-      const floatVal = parseFloat(value);
-      if (isNaN(floatVal)) return undefined;
-      return { type: 'float', value: floatVal };
-    }
-
-    case 'DATE': {
-      const dateVal = parseDate(value);
-      if (!dateVal) return undefined;
-      return { type: 'date', value: dateVal };
-    }
-
-    case 'TIME': {
-      const timeVal = parseTime(value);
-      if (!timeVal) return undefined;
-      return { type: 'time', value: timeVal };
-    }
-
-    case 'DATETIME': {
-      const datetimeVal = parseDatetime(value);
-      if (!datetimeVal) return undefined;
-      return { type: 'datetime', value: datetimeVal };
-    }
-
-    case 'BOOLEAN': {
-      const lower = value.toLowerCase();
-      if (['true', 'yes', 'y', '1'].includes(lower)) return { type: 'boolean', value: true };
-      if (['false', 'no', 'n', '0'].includes(lower)) return { type: 'boolean', value: false };
-      return undefined;
-    }
-
-    case 'POINT': {
-      // Parse "lat,lon" format
-      const parts = value.split(',').map(p => parseFloat(p.trim()));
-      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-        return { type: 'point', lat: parts[0], lon: parts[1] };
-      }
-      return undefined;
-    }
-
-    default:
-      return { type: 'text', value };
-  }
 }
 
 /**
