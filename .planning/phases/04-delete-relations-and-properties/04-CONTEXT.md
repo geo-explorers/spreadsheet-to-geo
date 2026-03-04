@@ -46,17 +46,19 @@ Delete specific relations and/or properties from entities without deleting the e
 - Standard flags: --dry-run, --force, --network, --space, --output, --verbose
 
 ### Error Handling & Recovery
+- Stop immediately on API failure — no retries
 - Atomic publish: all ops succeed or all fail — no partial state
 - No remaining-items output file needed (unlike entity delete) — atomic means nothing to retry
 - No pre-operation snapshot — entities aren't being deleted, input Excel serves as the record of what was attempted
 - Always save JSON report on success (consistent with delete and update commands) — includes counts and transaction hash
 
+### Template
+- Ship an Excel template file ("Geo delete-triples template.xlsx") with Relations and Properties tabs pre-filled with column headers
+
 ### Claude's Discretion
 - Dry-run preview table layout and detail level
 - How to validate relation ID existence via API (may need new GraphQL query)
 - Report format and detail level
-- Whether to create an Excel template file
-- Error retry strategy (retry vs stop immediately on API failure)
 
 </decisions>
 
