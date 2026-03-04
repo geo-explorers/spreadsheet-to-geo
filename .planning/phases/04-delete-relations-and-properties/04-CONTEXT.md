@@ -41,16 +41,22 @@ Delete specific relations and/or properties from entities without deleting the e
 - Fail-fast: report all invalid IDs and abort before any publishing
 
 ### CLI Design
-- New subcommand: separate from existing `delete` command (which deletes entire entities)
+- Subcommand name: `delete-triples` — distinct from `delete` (whole entities), accurate in knowledge-graph terminology
 - Follows established pattern: dynamic import for command handler, same flag conventions
 - Standard flags: --dry-run, --force, --network, --space, --output, --verbose
 
+### Error Handling & Recovery
+- Atomic publish: all ops succeed or all fail — no partial state
+- No remaining-items output file needed (unlike entity delete) — atomic means nothing to retry
+- No pre-operation snapshot — entities aren't being deleted, input Excel serves as the record of what was attempted
+- Always save JSON report on success (consistent with delete and update commands) — includes counts and transaction hash
+
 ### Claude's Discretion
-- Exact subcommand name (e.g., `delete-triples`, `remove`, `unset`)
 - Dry-run preview table layout and detail level
 - How to validate relation ID existence via API (may need new GraphQL query)
 - Report format and detail level
 - Whether to create an Excel template file
+- Error retry strategy (retry vs stop immediately on API failure)
 
 </decisions>
 
@@ -98,4 +104,4 @@ None — discussion stayed within phase scope
 ---
 
 *Phase: 04-delete-relations-and-properties*
-*Context gathered: 2026-03-04*
+*Context gathered: 2026-03-04, updated: 2026-03-04*
