@@ -38,6 +38,10 @@ Progress: [██████████] 100%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 4 added: Delete relations and properties
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
@@ -76,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Completed 03-02-PLAN.md (update command handler and reporting) -- Phase 3 complete
-Resume file: .planning/phases/03-bulk-update/03-02-SUMMARY.md
+Last session: 2026-03-04
+Stopped at: Phase 4 context gathered
+Resume file: .planning/phases/04-delete-relations-and-properties/04-CONTEXT.md
