@@ -93,3 +93,14 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
 | 2. Bulk Delete | 0/3 | Not started | - |
 | 3. Bulk Update | 0/2 | Planned | - |
+
+### Phase 4: Delete relations and properties
+
+**Goal:** Users can selectively delete specific relations and unset specific properties from entities (without deleting the entities themselves) via an Excel spreadsheet with separate Relations and Properties tabs, validated and published atomically
+**Requirements**: P4-01, P4-02, P4-03, P4-04, P4-05, P4-06, P4-07, P4-08, P4-09, P4-10, P4-11
+**Depends on:** Phase 3
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- Types, Excel parser, relation validation API, and ops builder (wave 1)
+- [ ] 04-02-PLAN.md -- Command handler, report type, and CLI wiring (wave 2, depends on 04-01)
