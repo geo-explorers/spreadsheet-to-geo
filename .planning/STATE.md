@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-19)
 ## Current Position
 
 Phase: 4 of 4 (Delete Relations and Properties)
-Plan: 1 of 2 in current phase (complete)
-Status: In Progress
-Last activity: 2026-03-05 -- Completed 04-01-PLAN.md (delete-triples data pipeline)
+Plan: 2 of 2 in current phase (complete)
+Status: Complete
+Last activity: 2026-03-05 -- Completed 04-02-PLAN.md (delete-triples command handler and CLI)
 
-Progress: [██████████████░░░░░░] 75%
+Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 2.7min
-- Total execution time: 0.27 hours
+- Total plans completed: 7
+- Average duration: 2.6min
+- Total execution time: 0.30 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [██████████████░░░░░░] 75%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 03 | 2 | 5min | 2.5min |
-| 04 | 1 | 3min | 3.0min |
+| 04 | 2 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01 (3min), 03-02 (2min), 03-01 (3min), 01-02 (3min), 01-03 (2min)
+- Last 5 plans: 04-02 (2min), 04-01 (3min), 03-02 (2min), 03-01 (3min), 01-02 (3min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -72,6 +72,9 @@ Recent decisions affecting current work:
 - 04-01: Duplicated getColumnValue BOM helper from entity-id-parser.ts (not exported, simpler than coupling modules)
 - 04-01: Property unsets grouped by entity ID using Map for single updateEntity call per entity
 - 04-01: Relation validation via root relations query with id + spaceId filter (may need runtime verification)
+- 04-02: Shared cli-helpers (resolveNetwork, confirmAction) imported from utils -- no re-implementation
+- 04-02: Zeroed BatchSummary shim pattern reused from delete.ts for publishToGeo compatibility
+- 04-02: No --author flag for delete-triples (simpler than entity delete, no author override needed)
 
 ### Pending Todos
 
@@ -85,5 +88,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-05
-Stopped at: Completed 04-01-PLAN.md
-Resume file: .planning/phases/04-delete-relations-and-properties/04-01-SUMMARY.md
+Stopped at: Completed 04-02-PLAN.md (Phase 04 complete)
+Resume file: .planning/phases/04-delete-relations-and-properties/04-02-SUMMARY.md
