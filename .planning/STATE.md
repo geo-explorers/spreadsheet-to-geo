@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-19)
 
 **Core value:** Editors can fix data quality issues at scale through standardized spreadsheet-driven bulk operations
-**Current focus:** Phase 3: Bulk Update
+**Current focus:** Phase 4: Delete Relations and Properties
 
 ## Current Position
 
-Phase: 3 of 3 (Bulk Update)
-Plan: 2 of 2 in current phase (complete)
-Status: Phase Complete
-Last activity: 2026-02-24 -- Completed 03-02-PLAN.md (update command handler and reporting)
+Phase: 4 of 4 (Delete Relations and Properties)
+Plan: 1 of 2 in current phase (complete)
+Status: In Progress
+Last activity: 2026-03-05 -- Completed 04-01-PLAN.md (delete-triples data pipeline)
 
-Progress: [██████████] 100%
+Progress: [██████████████░░░░░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 2.6min
-- Total execution time: 0.22 hours
+- Total plans completed: 6
+- Average duration: 2.7min
+- Total execution time: 0.27 hours
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 01 | 3 | 8min | 2.7min |
 | 03 | 2 | 5min | 2.5min |
+| 04 | 1 | 3min | 3.0min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (2min), 03-01 (3min), 01-02 (3min), 01-03 (2min), 01-01 (3min)
+- Last 5 plans: 04-01 (3min), 03-02 (2min), 03-01 (3min), 01-02 (3min), 01-03 (2min)
 - Trend: stable
 
 *Updated after each plan completion*
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - 03-01: Canonical value normalization for diff comparison (both spreadsheet and API values normalized before comparing) to avoid false diffs
 - 03-02: Minimal BatchSummary adapter with zeroed upsert-specific fields to satisfy publishToGeo's OperationsBatch type, avoiding publisher interface refactor
 - 03-02: All update ops (updateEntity + createRelation + deleteRelation) collected into single flat Op[] array for atomic publish
+- 04-01: Duplicated getColumnValue BOM helper from entity-id-parser.ts (not exported, simpler than coupling modules)
+- 04-01: Property unsets grouped by entity ID using Map for single updateEntity call per entity
+- 04-01: Relation validation via root relations query with id + spaceId filter (may need runtime verification)
 
 ### Pending Todos
 
@@ -80,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-delete-relations-and-properties/04-CONTEXT.md
+Last session: 2026-03-05
+Stopped at: Completed 04-01-PLAN.md
+Resume file: .planning/phases/04-delete-relations-and-properties/04-01-SUMMARY.md
