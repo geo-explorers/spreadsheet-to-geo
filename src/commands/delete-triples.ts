@@ -241,6 +241,7 @@ export async function deleteTriplesCommand(file: string, options: DeleteTriplesO
     const metadata: Metadata = {
       spaceId,
       spaceType: 'Personal',
+      author: options.author || spaceId,
     };
 
     // Create OperationsBatch-compatible object for the publisher (zeroed BatchSummary shim)

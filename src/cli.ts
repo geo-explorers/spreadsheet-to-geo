@@ -108,6 +108,7 @@ const deleteTriplesCmd = program
   .argument('[file]', 'Path to Excel (.xlsx) file with relation IDs and/or property IDs')
   .description('Delete specific relations and unset specific properties from entities')
   .option('-s, --space <id>', 'Override space ID from spreadsheet (32-char hex)')
+  .option('-a, --author <id>', 'Author ID for publish operations (32-char hex)')
   .option('-n, --network <network>', 'Network to publish to (TESTNET or MAINNET)')
   .option('--dry-run', 'Preview deletions without executing', false)
   .option('-f, --force', 'Skip confirmation prompt (for CI/scripts)', false)
@@ -115,6 +116,7 @@ const deleteTriplesCmd = program
   .option('-v, --verbose', 'Enable verbose logging', false)
   .action(async (file?: string, opts?: {
     space?: string;
+    author?: string;
     network?: string;
     dryRun: boolean;
     force: boolean;
@@ -128,6 +130,7 @@ const deleteTriplesCmd = program
     const { deleteTriplesCommand } = await import('./commands/delete-triples.js');
     await deleteTriplesCommand(file, {
       space: opts?.space,
+      author: opts?.author,
       network: opts?.network,
       dryRun: opts!.dryRun,
       force: opts!.force,

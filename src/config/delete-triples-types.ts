@@ -33,6 +33,7 @@ export interface TriplesParseResult {
 export interface DeleteTriplesOptions {
   network?: string;
   space?: string; // Optional --space flag override
+  author?: string; // Optional --author flag for publish operations
   dryRun: boolean;
   output: string; // Report output directory
   verbose: boolean;
