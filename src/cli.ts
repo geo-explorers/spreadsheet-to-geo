@@ -1,7 +1,7 @@
 /**
  * CLI router - Commander.js subcommand structure for geo-publish
  *
- * Registers subcommands: upsert, delete (stub), update (stub)
+ * Registers subcommands: upsert, delete, update, delete-triples
  * Each subcommand delegates to its own handler in src/commands/
  */
 
@@ -99,6 +99,43 @@ const updateCmd = program
       quiet: updateCmd.opts().quiet,
       yes: updateCmd.opts().yes,
       additive: updateCmd.opts().additive,
+    });
+  });
+
+// Delete-triples subcommand
+const deleteTriplesCmd = program
+  .command('delete-triples')
+  .argument('[file]', 'Path to Excel (.xlsx) file with relation IDs and/or property IDs')
+  .description('Delete specific relations and unset specific properties from entities')
+  .option('-s, --space <id>', 'Override space ID from spreadsheet (32-char hex)')
+  .option('-a, --author <id>', 'Author ID for publish operations (32-char hex)')
+  .option('-n, --network <network>', 'Network to publish to (TESTNET or MAINNET)')
+  .option('--dry-run', 'Preview deletions without executing', false)
+  .option('-f, --force', 'Skip confirmation prompt (for CI/scripts)', false)
+  .option('-o, --output <dir>', 'Output directory for reports', './reports')
+  .option('-v, --verbose', 'Enable verbose logging', false)
+  .action(async (file?: string, opts?: {
+    space?: string;
+    author?: string;
+    network?: string;
+    dryRun: boolean;
+    force: boolean;
+    output: string;
+    verbose: boolean;
+  }) => {
+    if (!file) {
+      deleteTriplesCmd.help();
+      return;
+    }
+    const { deleteTriplesCommand } = await import('./commands/delete-triples.js');
+    await deleteTriplesCommand(file, {
+      space: opts?.space,
+      author: opts?.author,
+      network: opts?.network,
+      dryRun: opts!.dryRun,
+      force: opts!.force,
+      output: opts!.output,
+      verbose: opts!.verbose,
     });
   });
 

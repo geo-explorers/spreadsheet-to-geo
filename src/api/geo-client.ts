@@ -627,3 +627,43 @@ export async function fetchEntityDetails(
     return null;
   }
 }
+
+/**
+ * Validate a relation exists by querying the Geo GraphQL API.
+ * Uses the root `relations` query with id filter.
+ * Returns relation details if found, null otherwise.
+ *
+ * NOTE: If the `id` filter on root `relations` query is not supported,
+ * this function will throw a GraphQL error. The command handler should
+ * catch this and fall back to entity-scoped validation.
+ */
+export async function fetchRelationById(
+  relationId: string,
+  spaceId: string,
+  network: 'TESTNET' | 'MAINNET'
+): Promise<{ id: string; fromEntityId: string; toEntityId: string; typeId: string } | null> {
+  const RELATION_VALIDATION_QUERY = `
+    query ValidateRelation($id: UUID!, $spaceId: UUID!) {
+      relations(filter: { id: { is: $id }, spaceId: { is: $spaceId } }) {
+        id
+        fromEntityId
+        toEntityId
+        typeId
+      }
+    }
+  `;
+
+  try {
+    const data = await executeQuery<{
+      relations: Array<{ id: string; fromEntityId: string; toEntityId: string; typeId: string }>;
+    }>(RELATION_VALIDATION_QUERY, { id: relationId, spaceId }, network);
+
+    const results = data.relations ?? [];
+    return results.length > 0 ? results[0] : null;
+  } catch (error) {
+    logger.warn(`Failed to validate relation "${relationId}"`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
