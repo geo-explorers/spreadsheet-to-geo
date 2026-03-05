@@ -166,7 +166,24 @@ export interface UpdateReport extends ReportBase {
 }
 
 /**
+ * Delete-triples operation report - captures relation deletions and property unsets.
+ */
+export interface DeleteTriplesReport extends ReportBase {
+  operationType: 'delete-triples';
+  summary: {
+    relationsDeleted: number;
+    propertiesUnset: number;
+    entitiesAffected: number;
+    totalOps: number;
+  };
+  details: {
+    relations: Array<{ relationId: string }>;
+    properties: Array<{ entityId: string; propertyId: string }>;
+  };
+}
+
+/**
  * Discriminated union of all operation reports.
  * Use `report.operationType` to narrow the type.
  */
-export type OperationReport = UpsertReport | DeleteReport | UpdateReport;
+export type OperationReport = UpsertReport | DeleteReport | UpdateReport | DeleteTriplesReport;
