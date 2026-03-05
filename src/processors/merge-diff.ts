@@ -17,6 +17,7 @@ import { Graph, SystemIds, type Op, type TypedValue } from '@geoprotocol/geo-sdk
 import type { EntityDetails } from '../api/geo-client.js';
 import type { MergePairDiff, MergeConflict } from '../config/merge-types.js';
 import { buildDeleteOps } from './delete-builder.js';
+import { logger } from '../utils/logger.js';
 
 // ============================================================================
 // Keeper relation dedup set
@@ -119,7 +120,7 @@ export function extractTypedValue(
         humanReadable: value.point,
       };
     }
-    // If point string can't be parsed, skip it
+    logger.warn(`Skipping unparseable point value "${value.point}" for property ${value.propertyId}`);
     return null;
   }
 
@@ -157,8 +158,11 @@ export function extractTypedValue(
  */
 export function computeMergePairDiff(
   keeper: EntityDetails,
-  merger: EntityDetails
+  merger: EntityDetails,
+  nameMap?: Map<string, string>
 ): MergePairDiff {
+  // Helper to resolve an ID to its human-readable name, falling back to the ID
+  const resolveName = (id: string) => nameMap?.get(id) ?? id;
   // -- Property comparison --
 
   // Build a Map of keeper's properties: propertyId -> humanReadableValue
@@ -187,15 +191,18 @@ export function computeMergePairDiff(
     const keeperHumanValue = keeperPropertyMap.get(mergerVal.propertyId);
 
     if (keeperHumanValue !== undefined) {
-      // Both entities have this property
-      if (keeperHumanValue === extracted.humanReadable) {
+      // Both entities have this property -- normalize for comparison
+      // (handles boolean casing: "True" vs "true", numeric whitespace, etc.)
+      const keeperNorm = keeperHumanValue.trim().toLowerCase();
+      const mergerNorm = extracted.humanReadable.trim().toLowerCase();
+      if (keeperNorm === mergerNorm) {
         // Same value -- skip silently (not a conflict)
         continue;
       }
       // Different values -- conflict (keeper wins)
       conflicts.push({
         propertyId: mergerVal.propertyId,
-        propertyName: mergerVal.propertyId, // We don't have the human name; use ID
+        propertyName: resolveName(mergerVal.propertyId),
         keeperValue: keeperHumanValue,
         mergerValue: extracted.humanReadable,
       });
@@ -203,7 +210,7 @@ export function computeMergePairDiff(
       // Keeper does NOT have this property -- transfer it
       propertiesToTransfer.push({
         propertyId: mergerVal.propertyId,
-        propertyName: mergerVal.propertyId, // We don't have the human name; use ID
+        propertyName: resolveName(mergerVal.propertyId),
         mergerValue: extracted.humanReadable,
         typedValue: extracted.typedValue,
       });
@@ -229,6 +236,7 @@ export function computeMergePairDiff(
       relationsSkipped.push({
         direction: 'outgoing',
         typeId: rel.typeId,
+        typeName: resolveName(rel.typeId),
         otherEntityId: rel.toEntity.id,
         otherEntityName: rel.toEntity.name ?? rel.toEntity.id,
       });
@@ -237,6 +245,7 @@ export function computeMergePairDiff(
         relationId: rel.id,
         direction: 'outgoing',
         typeId: rel.typeId,
+        typeName: resolveName(rel.typeId),
         otherEntityId: rel.toEntity.id,
         otherEntityName: rel.toEntity.name ?? rel.toEntity.id,
       });
@@ -256,6 +265,7 @@ export function computeMergePairDiff(
       relationsSkipped.push({
         direction: 'incoming',
         typeId: bl.typeId,
+        typeName: resolveName(bl.typeId),
         otherEntityId: bl.fromEntity.id,
         otherEntityName: bl.fromEntity.name ?? bl.fromEntity.id,
       });
@@ -264,6 +274,7 @@ export function computeMergePairDiff(
         relationId: bl.id,
         direction: 'incoming',
         typeId: bl.typeId,
+        typeName: resolveName(bl.typeId),
         otherEntityId: bl.fromEntity.id,
         otherEntityName: bl.fromEntity.name ?? bl.fromEntity.id,
       });
@@ -272,7 +283,9 @@ export function computeMergePairDiff(
 
   // -- Type comparison (union) --
 
-  const typesToTransfer = merger.typeIds.filter(t => !keeper.typeIds.includes(t));
+  const typesToTransfer = merger.typeIds
+    .filter(t => !keeper.typeIds.includes(t))
+    .map(t => ({ typeId: t, typeName: resolveName(t) }));
 
   // -- Merger deletion ops --
 
@@ -345,10 +358,10 @@ export function buildMergeOps(diff: MergePairDiff, keeperId: string): Op[] {
   }
 
   // 2. Type assignment ops
-  for (const typeId of diff.typesToTransfer) {
+  for (const type of diff.typesToTransfer) {
     const { ops } = Graph.createRelation({
       fromEntity: keeperId,
-      toEntity: typeId,
+      toEntity: type.typeId,
       type: SystemIds.TYPES_PROPERTY,
     });
     allOps.push(...ops);

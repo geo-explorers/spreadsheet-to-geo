@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { parseMergeTemplate } from '../parsers/merge-parser.js';
-import { searchEntitiesByNames, fetchEntityDetails } from '../api/geo-client.js';
+import { fetchEntityDetails, fetchEntityNamesByIds } from '../api/geo-client.js';
 import type { EntityDetails } from '../api/geo-client.js';
 import { computeMergePairDiff, buildMergeOps } from '../processors/merge-diff.js';
 import { resolveNetwork, confirmAction } from '../utils/cli-helpers.js';
@@ -26,7 +26,6 @@ import {
 } from '../publishers/merge-report.js';
 import { saveOperationReport } from '../publishers/report.js';
 import { validatePrivateKey, publishToGeo } from '../publishers/publisher.js';
-import { normalizeEntityName } from '../utils/cell-parsers.js';
 import { logger, setVerbose } from '../utils/logger.js';
 import type { MergeOptions, MergePairDiff, MergeSummary } from '../config/merge-types.js';
 import type { Metadata, PublishOptions } from '../config/types.js';
@@ -84,7 +83,7 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
 
     // Parse template
     logger.info('Parsing merge template...');
-    const { pairs, spaceId, operationType, errors } = parseMergeTemplate(filePath);
+    const { pairs, spaceId, spaceType, author, operationType, errors } = parseMergeTemplate(filePath);
 
     if (errors.length > 0) {
       logger.error('Merge template parsing errors:');
@@ -100,7 +99,7 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
     }
 
     // Warn if operationType is not MERGE
-    if (operationType && operationType.toUpperCase() !== 'MERGE') {
+    if (operationType && operationType !== 'MERGE') {
       logger.warn(
         `Template Operation type is '${operationType}' but running merge command. Proceeding.`
       );
@@ -109,82 +108,80 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
     logger.success(`Parsed ${pairs.length} merge pair(s) from template`);
     logger.keyValue('Space', spaceId);
 
-    // Collect all unique entity names from pairs
-    const allNames = Array.from(new Set([
-      ...pairs.map(p => p.keeperName),
-      ...pairs.map(p => p.mergerName),
-    ]));
-
-    logger.info(`Resolving ${allNames.length} entity names...`);
-
-    // Resolve all names via API
-    const resolvedGeoEntities = await searchEntitiesByNames(allNames, spaceId, network);
-
-    // Build resolved-entities map: normalized name -> { id, name }
-    const resolvedEntities = new Map<string, { id: string; name: string }>();
-    for (const [normalizedName, geoEntity] of Array.from(resolvedGeoEntities)) {
-      resolvedEntities.set(normalizedName, { id: geoEntity.id, name: geoEntity.name });
+    // Log pair details
+    for (const pair of pairs) {
+      const keeperLabel = pair.keeperName ? `${pair.keeperName} (${pair.keeperId})` : pair.keeperId;
+      const mergerLabel = pair.mergerName ? `${pair.mergerName} (${pair.mergerId})` : pair.mergerId;
+      logger.info(`  ${keeperLabel} <- ${mergerLabel}`);
     }
-
-    // Check for unresolved names -- hard error if any name can't be resolved
-    const unresolvedNames: string[] = [];
-    for (const name of allNames) {
-      const normalized = normalizeEntityName(name);
-      if (!resolvedEntities.has(normalized)) {
-        unresolvedNames.push(name);
-      }
-    }
-
-    if (unresolvedNames.length > 0) {
-      logger.error(`Cannot resolve ${unresolvedNames.length} entity name(s):`);
-      for (const name of unresolvedNames) {
-        logger.listItem(name);
-      }
-      logger.error('All entities must exist in Geo before merging.');
-      process.exit(1);
-    }
-
-    logger.success(`All ${allNames.length} names resolved`);
 
     // ========================================================================
     // PHASE 2: DIFF
     // ========================================================================
     logger.section('Phase 2: Diff');
 
-    const diffs: MergePairDiff[] = [];
     const keeperDetailsMap = new Map<string, EntityDetails>();
     const mergerDetailsMap = new Map<string, EntityDetails>();
 
+    // Fetch all entity details by ID (no name resolution needed)
     for (let i = 0; i < pairs.length; i++) {
       const pair = pairs[i];
-      logger.info(`Processing pair ${i + 1}/${pairs.length}: ${pair.keeperName} <- ${pair.mergerName}`);
+      const keeperLabel = pair.keeperName || pair.keeperId;
+      const mergerLabel = pair.mergerName || pair.mergerId;
+      logger.info(`Fetching pair ${i + 1}/${pairs.length}: ${keeperLabel} <- ${mergerLabel}`);
 
-      // Look up IDs from resolved entities
-      const keeperNorm = normalizeEntityName(pair.keeperName);
-      const mergerNorm = normalizeEntityName(pair.mergerName);
-      const keeper = resolvedEntities.get(keeperNorm)!;
-      const merger = resolvedEntities.get(mergerNorm)!;
-
-      // Fetch full entity details
-      const keeperDetails = await fetchEntityDetails(keeper.id, spaceId, network);
-      const mergerDetails = await fetchEntityDetails(merger.id, spaceId, network);
+      const keeperDetails = await fetchEntityDetails(pair.keeperId, spaceId, network);
+      const mergerDetails = await fetchEntityDetails(pair.mergerId, spaceId, network);
 
       if (!keeperDetails) {
-        logger.error(`Keeper entity "${pair.keeperName}" (${keeper.id}) disappeared between validation and diff.`);
+        logger.error(`Keeper entity ${pair.keeperId} not found in space ${spaceId}`);
         process.exit(1);
       }
 
       if (!mergerDetails) {
-        logger.error(`Merger entity "${pair.mergerName}" (${merger.id}) disappeared between validation and diff.`);
+        logger.error(`Merger entity ${pair.mergerId} not found in space ${spaceId}`);
         process.exit(1);
       }
 
-      // Save details for snapshot
+      // Cross-validate names if provided in template
+      if (pair.keeperName && keeperDetails.name && pair.keeperName !== keeperDetails.name) {
+        logger.warn(
+          `Keeper name mismatch at row ${pair.rowNumber}: template="${pair.keeperName}" vs Geo="${keeperDetails.name}"`
+        );
+      }
+      if (pair.mergerName && mergerDetails.name && pair.mergerName !== mergerDetails.name) {
+        logger.warn(
+          `Merger name mismatch at row ${pair.rowNumber}: template="${pair.mergerName}" vs Geo="${mergerDetails.name}"`
+        );
+      }
+
       keeperDetailsMap.set(keeperDetails.id, keeperDetails);
       mergerDetailsMap.set(mergerDetails.id, mergerDetails);
+    }
 
-      // Compute diff
-      const diff = computeMergePairDiff(keeperDetails, mergerDetails);
+    logger.success(`All ${pairs.length} pair(s) fetched successfully`);
+
+    // Collect all unique IDs (property IDs, type IDs, relation type IDs) for name resolution
+    const allEntityIds = new Set<string>();
+    for (const details of [...keeperDetailsMap.values(), ...mergerDetailsMap.values()]) {
+      for (const val of details.values) allEntityIds.add(val.propertyId);
+      for (const typeId of details.typeIds) allEntityIds.add(typeId);
+      for (const rel of details.relations) allEntityIds.add(rel.typeId);
+      for (const bl of details.backlinks) allEntityIds.add(bl.typeId);
+    }
+
+    // Batch-resolve IDs to human-readable names
+    logger.info(`Resolving ${allEntityIds.size} property/type names...`);
+    const nameMap = await fetchEntityNamesByIds([...allEntityIds], network);
+    logger.success(`Resolved ${nameMap.size}/${allEntityIds.size} names`);
+
+    // Compute diffs with name resolution
+    const diffs: MergePairDiff[] = [];
+    for (const pair of pairs) {
+      const keeperDetails = keeperDetailsMap.get(pair.keeperId)!;
+      const mergerDetails = mergerDetailsMap.get(pair.mergerId)!;
+
+      const diff = computeMergePairDiff(keeperDetails, mergerDetails, nameMap);
       diffs.push(diff);
     }
 
@@ -305,7 +302,8 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
 
       const metadata: Metadata = {
         spaceId,
-        spaceType: 'Personal',
+        spaceType: (spaceType === 'DAO' ? 'DAO' : 'Personal') as 'Personal' | 'DAO',
+        author: author || undefined,
       };
 
       const publishOptions: PublishOptions = {

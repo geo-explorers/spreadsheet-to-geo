@@ -84,7 +84,7 @@ export function printMergeDiffOutput(
     // Relations to re-point
     for (const rel of diff.relationsToRepoint) {
       console.log(
-        chalk.green(`    REPOINT [${rel.direction}] ${rel.typeId} -> ${rel.otherEntityName}`)
+        chalk.green(`    REPOINT [${rel.direction}] ${rel.typeName} -> ${rel.otherEntityName}`)
       );
     }
 
@@ -92,14 +92,14 @@ export function printMergeDiffOutput(
     if (options.verbose) {
       for (const rel of diff.relationsSkipped) {
         console.log(
-          chalk.gray(`    ~ SKIP [${rel.direction}] ${rel.typeId} -> ${rel.otherEntityName}`)
+          chalk.gray(`    ~ SKIP [${rel.direction}] ${rel.typeName} -> ${rel.otherEntityName}`)
         );
       }
     }
 
-    // Types to transfer (show type ID since we only have IDs)
-    for (const typeId of diff.typesToTransfer) {
-      console.log(chalk.green(`    ADD TYPE ${typeId}`));
+    // Types to transfer
+    for (const type of diff.typesToTransfer) {
+      console.log(chalk.green(`    ADD TYPE ${type.typeName}`));
     }
 
     // Merger deletion
@@ -130,19 +130,14 @@ export function printMergeSummary(
   summary: MergeSummary,
   publishResults?: Array<{ success: boolean; transactionHash?: string }>
 ): void {
-  logger.section('Merge Summary');
+  logger.section('Publish Results');
 
-  logger.keyValue('Pairs merged', summary.totalPairs);
-  logger.keyValue('Properties transferred', summary.propertiesTransferred);
-  logger.keyValue('Relations re-pointed', summary.relationsRepointed);
-  logger.keyValue('Conflicts skipped', summary.conflictsDetected);
-  logger.keyValue('Mergers deleted', summary.mergersDeleted);
+  logger.keyValue('Pairs processed', summary.totalPairs);
 
   if (publishResults) {
     const successCount = publishResults.filter(r => r.success).length;
     const failureCount = publishResults.filter(r => !r.success).length;
 
-    console.log();
     logger.keyValue('Successful publishes', successCount);
     if (failureCount > 0) {
       logger.keyValue('Failed publishes', failureCount);
