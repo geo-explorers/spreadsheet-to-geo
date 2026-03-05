@@ -2,7 +2,6 @@
  * Geo GraphQL API client for searching existing entities, types, and properties
  */
 
-import { SystemIds } from '@geoprotocol/geo-sdk';
 import { logger } from '../utils/logger.js';
 import { normalizeEntityName } from '../utils/cell-parsers.js';
 
@@ -12,8 +11,9 @@ const API_ENDPOINTS = {
   MAINNET: 'https://api.geobrowser.io/graphql',
 } as const;
 
-// Root space ID from SDK
-const ROOT_SPACE_ID = SystemIds.ROOT_SPACE_ID;
+// Geo knowledge graph space — where canonical types/properties live (e.g. Website, Description).
+// Note: this differs from SystemIds.ROOT_SPACE_ID (08c4f093...) which is the on-chain root.
+const ROOT_SPACE_ID = 'a19c345ab9866679b001d7d2138d88a1';
 
 /**
  * Entity returned from Geo API search
@@ -174,6 +174,19 @@ const PROPERTY_DETAILS_QUERY = `
 `;
 
 /**
+ * GraphQL query for batch-resolving entity names by IDs.
+ * Works for any entity type (properties, types, relation types are all entities).
+ */
+const ENTITY_NAMES_QUERY = `
+  query EntityNames($filter: EntityFilter, $limit: Int) {
+    entities(filter: $filter, first: $limit) {
+      id
+      name
+    }
+  }
+`;
+
+/**
  * Execute a GraphQL query against the Geo API
  */
 async function executeQuery<T>(
@@ -249,7 +262,8 @@ export async function searchEntityByName(
   name: string,
   spaceId: string | null,
   network: 'TESTNET' | 'MAINNET',
-  expectedTypes?: string[]
+  expectedTypes?: string[],
+  strictSpaceFilter = false
 ): Promise<GeoEntity | null> {
   try {
     const data = await executeQuery<{ search: GeoEntity[] }>(
@@ -266,19 +280,31 @@ export async function searchEntityByName(
 
     if (exactMatches.length === 0) return null;
 
-    // When expected types are provided, prefer a result whose type matches
+    // When expected types are provided, filter to matching types first
+    let candidates = exactMatches;
     if (expectedTypes && expectedTypes.length > 0) {
       const normalizedExpected = expectedTypes.map(t => normalizeEntityName(t));
-      const typeMatch = exactMatches.find(entity =>
+      candidates = exactMatches.filter(entity =>
         entity.types.some(t => normalizedExpected.includes(normalizeEntityName(t.name)))
       );
-      if (typeMatch) return typeMatch;
-      // No match with correct type — return null rather than wrong-typed entity
-      return null;
+      if (candidates.length === 0) return null;
     }
 
-    // Fall back to first exact match when no expectedTypes filter
-    return exactMatches[0];
+    // When strictSpaceFilter is on (properties/types), only return entities
+    // that actually live in the searched space. The API returns cross-space
+    // results, so without this we'd link to wrong entities from other spaces.
+    if (strictSpaceFilter && spaceId) {
+      const inSpace = candidates.filter(e => e.spaceIds.includes(spaceId));
+      return inSpace[0] ?? null;
+    }
+
+    // For non-strict (entities), prefer match in searched space but accept any
+    if (spaceId) {
+      const inSpace = candidates.find(e => e.spaceIds.includes(spaceId));
+      if (inSpace) return inSpace;
+    }
+
+    return candidates[0];
   } catch (error) {
     logger.warn(`Failed to search for entity "${name}"`, {
       error: error instanceof Error ? error.message : String(error),
@@ -390,8 +416,8 @@ export async function searchTypesByNames(
     const batch = names.slice(i, i + batchSize);
     const searchPromises = batch.flatMap(name =>
       isValidTargetSpace
-        ? [searchEntityByName(name, ROOT_SPACE_ID, network, typeFilter), searchEntityByName(name, targetSpaceId, network, typeFilter)]
-        : [searchEntityByName(name, ROOT_SPACE_ID, network, typeFilter)]
+        ? [searchEntityByName(name, ROOT_SPACE_ID, network, typeFilter, true), searchEntityByName(name, targetSpaceId, network, typeFilter, true)]
+        : [searchEntityByName(name, ROOT_SPACE_ID, network, typeFilter, true)]
     );
 
     const searchResults = await Promise.all(searchPromises);
@@ -447,8 +473,8 @@ export async function searchPropertiesByNames(
     const batch = names.slice(i, i + batchSize);
     const searchPromises = batch.flatMap(name =>
       isValidTargetSpace
-        ? [searchEntityByName(name, ROOT_SPACE_ID, network, propFilter), searchEntityByName(name, targetSpaceId, network, propFilter)]
-        : [searchEntityByName(name, ROOT_SPACE_ID, network, propFilter)]
+        ? [searchEntityByName(name, ROOT_SPACE_ID, network, propFilter, true), searchEntityByName(name, targetSpaceId, network, propFilter, true)]
+        : [searchEntityByName(name, ROOT_SPACE_ID, network, propFilter, true)]
     );
 
     const searchResults = await Promise.all(searchPromises);
@@ -649,4 +675,41 @@ export async function fetchEntityDetails(
     });
     return null;
   }
+}
+
+/**
+ * Batch-resolve entity names by IDs.
+ * Works for any entity type: properties, types, and relation types are all entities in Geo.
+ * Returns a Map of entityId -> human-readable name. IDs not found are omitted.
+ */
+export async function fetchEntityNamesByIds(
+  ids: string[],
+  network: 'TESTNET' | 'MAINNET'
+): Promise<Map<string, string>> {
+  const nameMap = new Map<string, string>();
+  if (ids.length === 0) return nameMap;
+
+  const uniqueIds = [...new Set(ids)];
+  const batchSize = 50;
+
+  for (let i = 0; i < uniqueIds.length; i += batchSize) {
+    const batch = uniqueIds.slice(i, i + batchSize);
+    try {
+      const data = await executeQuery<{
+        entities: Array<{ id: string; name: string | null }>;
+      }>(ENTITY_NAMES_QUERY, { filter: { id: { in: batch } }, limit: batch.length }, network);
+
+      for (const entity of data.entities ?? []) {
+        if (entity.name) {
+          nameMap.set(entity.id, entity.name);
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to batch-resolve entity names (non-fatal)', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return nameMap;
 }
