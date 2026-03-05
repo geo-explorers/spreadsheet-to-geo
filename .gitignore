@@ -11,8 +11,7 @@ dist/
 # Reports (generated)
 reports/
 
-#testing-datasets 
-testing-datasets/
+.snapshots/
 
 # OS files
 .DS_Store

@@ -14,7 +14,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: CLI Restructure and Shared Infrastructure** - Extract monolithic index.ts into subcommand CLI with shared modules, CSV parser, entity detail queries, and generalized reporting
 - [x] **Phase 2: Bulk Delete** - Complete delete pipeline: CSV input, entity validation, triple removal (properties, relations, backlinks, types), entity deletion, dry-run, reporting
-- [ ] **Phase 3: Bulk Update** - Complete update pipeline: Excel input with entity ID column, property overwrite via updateEntity, unset for cleared cells, dry-run, reporting
+- [x] **Phase 3: Bulk Update** - Complete update pipeline: Excel input with entity ID column, property overwrite via updateEntity, unset for cleared cells, dry-run, reporting
+- [x] **Phase 4: Bulk Merge** -  Complete merge pipeline: CSV input with survivor_id/duplicate_id pairs, entity validation, unique property and relation transfer from duplicates onto survivor (no overwrite of existing survivor values), duplicate entity deletion via standard delete sequence, dry-run showing what will be transferred and deleted, conflict reporting for duplicate properties, summary reporting
 
 ## Phase Details
 
@@ -79,8 +80,58 @@ diffs provided values against live data, and writes only what has changed.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Update infrastructure: shared CLI helpers, update types, diff engine (wave 1)
-- [ ] 03-02-PLAN.md -- Update command pipeline, CLI wiring, report generation (wave 2)
+- [x] 03-01-PLAN.md -- Update infrastructure: shared CLI helpers, update types, diff engine (wave 1)
+- [x] 03-02-PLAN.md -- Update command pipeline, CLI wiring, report generation (wave 2)
+
+### Phase 4: Bulk Merge
+**Goal**: Engineers can bulk-merge duplicate entities from a CSV of survivor/duplicate pairs — unique properties and relations from each duplicate are copied onto the survivor, then the duplicate is deleted. Survivor's existing data is never overwritten.
+**Depends on**: Phase 2 (delete pipeline)
+**Requirements**: MERGE-01 through MERGE-09
+**Success Criteria** (what must be TRUE):
+  1. Running `geo-publish merge template.xlsx --space <id>` copies unique properties and relations from each duplicate onto its survivor, then deletes the duplicate
+  2. Survivor's existing property values are never overwritten — only missing properties are added
+  3. Running with `--dry-run` shows per-pair: properties to transfer, relations to re-point, conflicts (properties both entities have), and which entities will be deleted
+  4. Tool validates all entity IDs exist before executing any operations
+  5. Each merge pair is published as a single atomic transaction
+  6. Summary report shows pairs merged, properties transferred, relations re-pointed, conflicts skipped, entities deleted
+**Merge example**
+
+*Three entities representing the same thing, published by different curators.*
+
+**Entity A.**
+
+- Name: ChatGPT
+- Type: AI model
+- Developer: OpenAI
+- Description: OpenAI’s flagship generative AI model used for conversational tasks, text generation, and reasoning
+- Released: 2022
+- Related topics: natural language processing, large language models, mainstream AI products
+
+**Entity B.**
+
+- Name: GPT
+- Type: AI model
+- Developer: OpenAI
+- Description: A large-scale conversational language model trained on diverse text data to generate, interpret, and refine human language across a wide range of tasks.
+- Released: 2022
+- Related topics: AI, large language models, AI tools
+
+**Entity C.**
+
+- Name: Generative pre-trained transformer
+- Type: AI model
+- Developer: OpenAI
+- Description: OpenAI’s most popular AI product
+- Released: 2022
+- Related topics: AI models, large language models, AI tools.
+
+Entity A was published first, so it survives. Its description stays. Related topics from B and C that aren’t already on A get added. Entities B and C are deleted.
+**Plans:** 3 plans
+
+Plans:
+- [x] 04-01-PLAN.md -- Merge types and Excel parser extension (wave 1)
+- [x] 04-02-PLAN.md -- Merge diff engine with conflict detection (wave 2, depends on 04-01)
+- [x] 04-03-PLAN.md -- Merge command handler, CLI wiring, reporting (wave 3, depends on 04-01, 04-02)
 
 ## Progress
 
@@ -91,5 +142,6 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
-| 2. Bulk Delete | 0/3 | Not started | - |
-| 3. Bulk Update | 0/2 | Planned | - |
+| 2. Bulk Delete | 0/3 | Complete | - |
+| 3. Bulk Update | 0/2 | Complete | - |
+| 4. Bulk Merge  | 3/3 | Complete | 2026-03-03 |

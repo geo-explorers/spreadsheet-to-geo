@@ -65,13 +65,17 @@ export async function buildEntityMap(
   }
 
   // 5. Query Geo API for existing entities, types, and properties
+  // Run types & properties first (small batches), then entities (large) to avoid API throttling
   logger.subsection('Querying Geo API');
 
-  const [existingEntities, existingTypes, existingProperties] = await Promise.all([
-    searchEntitiesByNames(Array.from(allEntityNames), data.metadata.spaceId, network, typeHints),
-    searchTypesByNames(allTypeNames, network),
-    searchPropertiesByNames(allPropertyNames, network),
+  const [existingTypes, existingProperties] = await Promise.all([
+    searchTypesByNames(allTypeNames, network, data.metadata.spaceId),
+    searchPropertiesByNames(allPropertyNames, network, data.metadata.spaceId),
   ]);
+
+  const existingEntities = await searchEntitiesByNames(
+    Array.from(allEntityNames), data.metadata.spaceId, network, typeHints
+  );
 
   logger.info(`API Results`, {
     entitiesFound: existingEntities.size,
@@ -202,7 +206,17 @@ async function processProperties(
       });
 
       // Warn if spreadsheet dataType differs from what Geo has
-      if (existing.dataTypeName && existing.dataTypeName.toUpperCase() !== prop.dataType.toUpperCase()) {
+      // Normalize Geo API type names to SDK canonical names for comparison
+      const GEO_TYPE_ALIASES: Record<string, string> = {
+        DECIMAL: 'FLOAT',
+        NUMBER: 'FLOAT',
+        STRING: 'TEXT',
+        BOOL: 'BOOLEAN',
+        INT: 'INTEGER',
+      };
+      const geoNormalized = GEO_TYPE_ALIASES[existing.dataTypeName?.toUpperCase() ?? ''] ?? existing.dataTypeName?.toUpperCase();
+      const sheetNormalized = prop.dataType.toUpperCase();
+      if (existing.dataTypeName && geoNormalized !== sheetNormalized) {
         logger.warn(
           `Property "${prop.name}" dataType mismatch: spreadsheet says ${prop.dataType}, Geo has ${existing.dataTypeName} — using Geo's type`
         );
