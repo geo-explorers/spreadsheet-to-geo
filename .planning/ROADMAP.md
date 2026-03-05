@@ -93,6 +93,7 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 | 1. CLI Restructure and Shared Infrastructure | 3/3 | Complete | 2026-02-22 |
 | 2. Bulk Delete | 0/3 | Not started | - |
 | 3. Bulk Update | 0/2 | Planned | - |
+| 4. Delete Relations and Properties | 2/2 | Complete | 2026-03-05 |
 
 ### Phase 4: Delete relations and properties
 
@@ -102,5 +103,5 @@ Note: Phase 3 (Update) depends only on Phase 1, not Phase 2. If parallelization 
 **Plans:** 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Types, Excel parser, relation validation API, and ops builder (wave 1)
-- [ ] 04-02-PLAN.md -- Command handler, report type, and CLI wiring (wave 2, depends on 04-01)
+- [x] 04-01-PLAN.md -- Types, Excel parser, relation validation API, and ops builder (wave 1)
+- [x] 04-02-PLAN.md -- Command handler, report type, and CLI wiring (wave 2, depends on 04-01)
