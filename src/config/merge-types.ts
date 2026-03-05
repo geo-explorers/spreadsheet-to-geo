@@ -30,9 +30,11 @@ export interface MergeOptions {
 
 /** A single keeper/merger pair from the Excel merge template */
 export interface MergePair {
-  keeperName: string;   // Keeper entity name from spreadsheet
-  mergerName: string;   // Merger entity name from spreadsheet
-  rowNumber: number;    // 1-based row number for error reporting
+  keeperId: string;      // Keeper entity ID (required)
+  mergerId: string;      // Merger entity ID (required)
+  keeperName?: string;   // Optional keeper name (for readability/cross-validation)
+  mergerName?: string;   // Optional merger name (for readability/cross-validation)
+  rowNumber: number;     // 1-based row number for error reporting
 }
 
 // ============================================================================
@@ -70,6 +72,7 @@ export interface MergePairDiff {
     relationId: string;
     direction: 'outgoing' | 'incoming';
     typeId: string;
+    typeName: string;
     otherEntityId: string;
     otherEntityName: string;
   }>;
@@ -78,12 +81,13 @@ export interface MergePairDiff {
   relationsSkipped: Array<{
     direction: 'outgoing' | 'incoming';
     typeId: string;
+    typeName: string;
     otherEntityId: string;
     otherEntityName: string;
   }>;
 
   /** Type IDs the merger has that the keeper does not */
-  typesToTransfer: string[];
+  typesToTransfer: Array<{ typeId: string; typeName: string }>;
 
   /** Ops from buildDeleteOps() for post-transfer merger cleanup */
   mergerDeleteOps: Op[];
@@ -104,8 +108,3 @@ export interface MergeSummary {
   mergersDeleted: number;
 }
 
-/** Ops for a single pair ready for publishing */
-export interface MergeBatch {
-  ops: Op[];
-  pairDiff: MergePairDiff;   // The diff that produced these ops
-}
