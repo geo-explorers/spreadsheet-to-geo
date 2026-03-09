@@ -50,21 +50,23 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **UPD-05**: Dry-run mode shows what properties will be changed per entity
 - [x] **UPD-06**: Summary report shows counts of entities updated, properties set, properties unset
 
-## v2 Requirements
-
-Deferred to future release. Tracked but not in current roadmap.
 
 ### Merge Operation
 
-- **MERGE-01**: User can provide CSV with keeper_id/merger_id pairs as merge input
-- **MERGE-02**: Tool validates both keeper and merger entities exist
-- **MERGE-03**: Tool copies properties from merger to keeper without overwriting keeper's existing values
-- **MERGE-04**: Tool re-points relations from merger to keeper
-- **MERGE-05**: Tool deletes merger entity after transfer (using delete logic)
-- **MERGE-06**: All ops for a merge pair published in single atomic transaction
-- **MERGE-07**: Dry-run mode shows property transfers, relation re-points, and conflicts
-- **MERGE-08**: Merge conflict detection logs when keeper already has a value merger also has
-- **MERGE-09**: Summary report shows properties transferred, relations re-pointed, mergers deleted
+- [x] **MERGE-01**: User can provide CSV with keeper_id/merger_id pairs as merge input
+- [x] **MERGE-02**: Tool validates both keeper and merger entities exist
+- [x] **MERGE-03**: Tool copies properties from merger to keeper without overwriting keeper's existing values
+- [x] **MERGE-04**: Tool re-points relations from merger to keeper
+- [x] **MERGE-05**: Tool deletes merger entity after transfer (using delete logic)
+- [x] **MERGE-06**: All ops for a merge pair published in single atomic transaction
+- [x] **MERGE-07**: Dry-run mode shows property transfers, relation re-points, and conflicts
+- [x] **MERGE-08**: Merge conflict detection logs when keeper already has a value merger also has
+- [x] **MERGE-09**: Summary report shows properties transferred, relations re-pointed, mergers deleted
+
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
 
 ### Enhancements
 
@@ -117,10 +119,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UPD-04 | Phase 3 | Complete |
 | UPD-05 | Phase 3 | Complete |
 | UPD-06 | Phase 3 | Complete |
+| MERGE-01 | Phase 4 | Complete |
+| MERGE-02 | Phase 4 | Complete |
+| MERGE-03 | Phase 4 | Complete |
+| MERGE-04 | Phase 4 | Complete |
+| MERGE-05 | Phase 4 | Complete |
+| MERGE-06 | Phase 4 | Complete |
+| MERGE-07 | Phase 4 | Complete |
+| MERGE-08 | Phase 4 | Complete |
+| MERGE-09 | Phase 4 | Complete |
 
 **Coverage:**
-- v1 requirements: 28 total
-- Mapped to phases: 28
+- v1 requirements: 37 total
+- Mapped to phases: 37
 - Unmapped: 0
 
 ---

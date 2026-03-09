@@ -223,35 +223,53 @@ async function buildImageOps(
     return imageMap;
   }
 
-  logger.info(`Uploading ${urlToEntities.size} unique image(s)...`);
+  const totalImages = urlToEntities.size;
+  logger.info(`Uploading ${totalImages} unique image(s)...`);
 
-  // Upload each unique URL
-  for (const [url, refs] of urlToEntities) {
-    try {
-      const result = await Graph.createImage({ url, network });
-      ops.push(...result.ops);
-      summary.imagesUploaded++;
+  // Upload images in concurrent batches of 10
+  const CONCURRENCY = 10;
+  const entries = [...urlToEntities.entries()];
 
-      logger.debug(`Image uploaded: ${url}`, {
-        id: result.id,
-        cid: result.cid,
-        dimensions: result.dimensions,
-      });
+  for (let i = 0; i < entries.length; i += CONCURRENCY) {
+    const batch = entries.slice(i, i + CONCURRENCY);
 
-      // Map the image ID back to all entities that reference this URL
-      for (const { normalized, field } of refs) {
-        const existing = imageMap.get(normalized) || {};
-        if (field === 'avatar') {
-          existing.avatarImageId = result.id;
-        } else {
-          existing.coverImageId = result.id;
+    const results = await Promise.allSettled(
+      batch.map(async ([url, refs]) => {
+        const result = await Graph.createImage({ url, network });
+        return { url, refs, result };
+      })
+    );
+
+    for (const settled of results) {
+      if (settled.status === 'fulfilled') {
+        const { url, refs, result } = settled.value;
+        ops.push(...result.ops);
+        summary.imagesUploaded++;
+
+        logger.debug(`Image uploaded: ${url}`, {
+          id: result.id,
+          cid: result.cid,
+          dimensions: result.dimensions,
+        });
+
+        for (const { normalized, field } of refs) {
+          const existing = imageMap.get(normalized) || {};
+          if (field === 'avatar') {
+            existing.avatarImageId = result.id;
+          } else {
+            existing.coverImageId = result.id;
+          }
+          imageMap.set(normalized, existing);
         }
-        imageMap.set(normalized, existing);
+      } else {
+        const url = batch[results.indexOf(settled)][0];
+        logger.warn(`Failed to upload image ${url}: ${settled.reason}`);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn(`Failed to upload image ${url}: ${message}`);
-      // Continue — entity will be created without the image
+    }
+
+    const uploaded = Math.min(i + CONCURRENCY, totalImages);
+    if (totalImages > CONCURRENCY) {
+      logger.info(`Uploaded ${uploaded}/${totalImages} images...`);
     }
   }
 

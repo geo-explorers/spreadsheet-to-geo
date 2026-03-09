@@ -1,6 +1,5 @@
 {
-  "mode": "yolo",
-  "depth": "quick",
+  "mode": "interactive",
   "parallelization": true,
   "commit_docs": true,
   "model_profile": "quality",
@@ -13,5 +12,6 @@
   },
   "git": {
     "branching_strategy": "none"
-  }
+  },
+  "granularity": "standard"
 }
