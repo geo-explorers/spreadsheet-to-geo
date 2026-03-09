@@ -15,7 +15,7 @@
 
 import { Graph, SystemIds, type Op, type TypedValue } from '@geoprotocol/geo-sdk';
 import type { EntityDetails } from '../api/geo-client.js';
-import type { MergePairDiff, MergeConflict } from '../config/merge-types.js';
+import type { MergePairDiff, MergeConflict, CrossSpaceStrategy, CrossSpaceOps } from '../config/merge-types.js';
 import { buildDeleteOps } from './delete-builder.js';
 import { logger } from '../utils/logger.js';
 
@@ -156,11 +156,22 @@ export function extractTypedValue(
  * Merger deletion:
  * - Uses buildDeleteOps() to produce blank-out ops for the merger entity
  */
+/** Options for cross-space diff behavior */
+interface MergeDiffOptions {
+  crossSpaceStrategy?: CrossSpaceStrategy;
+  keeperSpaceId?: string;
+  mergerSpaceId?: string;
+}
+
 export function computeMergePairDiff(
   keeper: EntityDetails,
   merger: EntityDetails,
-  nameMap?: Map<string, string>
+  nameMap?: Map<string, string>,
+  options?: MergeDiffOptions
 ): MergePairDiff {
+  const isCrossSpace = !!(options?.crossSpaceStrategy);
+  const isLinkMode = options?.crossSpaceStrategy === 'link';
+
   // Helper to resolve an ID to its human-readable name, falling back to the ID
   const resolveName = (id: string) => nameMap?.get(id) ?? id;
   // -- Property comparison --
@@ -188,32 +199,39 @@ export function computeMergePairDiff(
       continue; // Null or untransferable (schedule)
     }
 
-    const keeperHumanValue = keeperPropertyMap.get(mergerVal.propertyId);
-
-    if (keeperHumanValue !== undefined) {
-      // Both entities have this property -- normalize for comparison
-      // (handles boolean casing: "True" vs "true", numeric whitespace, etc.)
-      const keeperNorm = keeperHumanValue.trim().toLowerCase();
-      const mergerNorm = extracted.humanReadable.trim().toLowerCase();
-      if (keeperNorm === mergerNorm) {
-        // Same value -- skip silently (not a conflict)
-        continue;
-      }
-      // Different values -- conflict (keeper wins)
-      conflicts.push({
-        propertyId: mergerVal.propertyId,
-        propertyName: resolveName(mergerVal.propertyId),
-        keeperValue: keeperHumanValue,
-        mergerValue: extracted.humanReadable,
-      });
-    } else {
-      // Keeper does NOT have this property -- transfer it
+    if (isLinkMode) {
+      // Link mode: no conflicts -- data coexists in different spaces.
+      // Transfer ALL properties regardless of what keeper has in its own space.
       propertiesToTransfer.push({
         propertyId: mergerVal.propertyId,
         propertyName: resolveName(mergerVal.propertyId),
         mergerValue: extracted.humanReadable,
         typedValue: extracted.typedValue,
       });
+    } else {
+      // Same-space or migrate mode: conflict detection applies
+      const keeperHumanValue = keeperPropertyMap.get(mergerVal.propertyId);
+
+      if (keeperHumanValue !== undefined) {
+        const keeperNorm = keeperHumanValue.trim().toLowerCase();
+        const mergerNorm = extracted.humanReadable.trim().toLowerCase();
+        if (keeperNorm === mergerNorm) {
+          continue;
+        }
+        conflicts.push({
+          propertyId: mergerVal.propertyId,
+          propertyName: resolveName(mergerVal.propertyId),
+          keeperValue: keeperHumanValue,
+          mergerValue: extracted.humanReadable,
+        });
+      } else {
+        propertiesToTransfer.push({
+          propertyId: mergerVal.propertyId,
+          propertyName: resolveName(mergerVal.propertyId),
+          mergerValue: extracted.humanReadable,
+          typedValue: extracted.typedValue,
+        });
+      }
     }
   }
 
@@ -294,8 +312,11 @@ export function computeMergePairDiff(
   return {
     keeperName: keeper.name ?? keeper.id,
     keeperId: keeper.id,
+    keeperSpaceId: options?.keeperSpaceId ?? '',
     mergerName: merger.name ?? merger.id,
     mergerId: merger.id,
+    mergerSpaceId: options?.mergerSpaceId ?? '',
+    isCrossSpace,
     propertiesToTransfer,
     conflicts,
     relationsToRepoint,
@@ -398,4 +419,154 @@ export function buildMergeOps(diff: MergePairDiff, keeperId: string): Op[] {
   allOps.push(...diff.mergerDeleteOps);
 
   return allOps;
+}
+
+// ============================================================================
+// Cross-space op builder
+// ============================================================================
+
+/**
+ * Build ops split by target space for cross-space merges.
+ *
+ * For 'migrate': keeper-space gets data additions, merger-space gets deletions.
+ * For 'link': keeper-space is empty, merger-space gets everything
+ *             (data created under keeper's entity ID within merger's space).
+ */
+export function buildCrossSpaceMergeOps(
+  diff: MergePairDiff,
+  keeperId: string,
+  strategy: CrossSpaceStrategy
+): CrossSpaceOps {
+  if (strategy === 'link') {
+    // Link mode: ALL ops target merger's space.
+    // We create data about the keeper's entity ID in the merger's space.
+    // This makes the keeper a multi-space entity.
+    const mergerSpaceOps: Op[] = [];
+
+    // 1. Create properties on keeper's entity ID (in merger's space)
+    const descriptionTransfer = diff.propertiesToTransfer.find(
+      p => p.propertyId === SystemIds.DESCRIPTION_PROPERTY
+    );
+    const regularTransfers = diff.propertiesToTransfer.filter(
+      p => p.propertyId !== SystemIds.DESCRIPTION_PROPERTY
+    );
+
+    const values = regularTransfers.map(p => ({
+      property: p.propertyId,
+      ...p.typedValue,
+    }));
+    const description = descriptionTransfer?.mergerValue;
+
+    if (values.length > 0 || description) {
+      const updateParams: { id: string; values?: typeof values; description?: string } = { id: keeperId };
+      if (values.length > 0) updateParams.values = values;
+      if (description) updateParams.description = description;
+      const { ops } = Graph.updateEntity(updateParams);
+      mergerSpaceOps.push(...ops);
+    }
+
+    // 2. Type assignments on keeper's entity ID (in merger's space)
+    for (const type of diff.typesToTransfer) {
+      const { ops } = Graph.createRelation({
+        fromEntity: keeperId,
+        toEntity: type.typeId,
+        type: SystemIds.TYPES_PROPERTY,
+      });
+      mergerSpaceOps.push(...ops);
+    }
+
+    // 3. Relation re-pointing: delete old + create new (all in merger's space)
+    for (const rel of diff.relationsToRepoint) {
+      const { ops: deleteOps } = Graph.deleteRelation({ id: rel.relationId });
+      mergerSpaceOps.push(...deleteOps);
+
+      if (rel.direction === 'outgoing') {
+        const { ops: createOps } = Graph.createRelation({
+          fromEntity: keeperId,
+          toEntity: rel.otherEntityId,
+          type: rel.typeId,
+        });
+        mergerSpaceOps.push(...createOps);
+      } else {
+        const { ops: createOps } = Graph.createRelation({
+          fromEntity: rel.otherEntityId,
+          toEntity: keeperId,
+          type: rel.typeId,
+        });
+        mergerSpaceOps.push(...createOps);
+      }
+    }
+
+    // 4. Delete merger entity (in merger's space)
+    mergerSpaceOps.push(...diff.mergerDeleteOps);
+
+    return { keeperSpaceOps: [], mergerSpaceOps };
+  }
+
+  // Migrate mode: split ops between keeper's space and merger's space.
+  const keeperSpaceOps: Op[] = [];
+  const mergerSpaceOps: Op[] = [];
+
+  // 1. Property transfers → keeper's space
+  const descriptionTransfer = diff.propertiesToTransfer.find(
+    p => p.propertyId === SystemIds.DESCRIPTION_PROPERTY
+  );
+  const regularTransfers = diff.propertiesToTransfer.filter(
+    p => p.propertyId !== SystemIds.DESCRIPTION_PROPERTY
+  );
+
+  const values = regularTransfers.map(p => ({
+    property: p.propertyId,
+    ...p.typedValue,
+  }));
+  const description = descriptionTransfer?.mergerValue;
+
+  if (values.length > 0 || description) {
+    const updateParams: { id: string; values?: typeof values; description?: string } = { id: keeperId };
+    if (values.length > 0) updateParams.values = values;
+    if (description) updateParams.description = description;
+    const { ops } = Graph.updateEntity(updateParams);
+    keeperSpaceOps.push(...ops);
+  }
+
+  // 2. Type assignments → keeper's space
+  for (const type of diff.typesToTransfer) {
+    const { ops } = Graph.createRelation({
+      fromEntity: keeperId,
+      toEntity: type.typeId,
+      type: SystemIds.TYPES_PROPERTY,
+    });
+    keeperSpaceOps.push(...ops);
+  }
+
+  // 3. Relation re-pointing
+  for (const rel of diff.relationsToRepoint) {
+    // Delete old relation → merger's space (relation lives there)
+    const { ops: deleteOps } = Graph.deleteRelation({ id: rel.relationId });
+    mergerSpaceOps.push(...deleteOps);
+
+    // Create new relation:
+    // - Outgoing relations → keeper's space (keeper is the fromEntity)
+    // - Incoming backlinks → merger's space (third-party entity lives in merger's space)
+    if (rel.direction === 'outgoing') {
+      const { ops: createOps } = Graph.createRelation({
+        fromEntity: keeperId,
+        toEntity: rel.otherEntityId,
+        type: rel.typeId,
+      });
+      keeperSpaceOps.push(...createOps);
+    } else {
+      const { ops: createOps } = Graph.createRelation({
+        fromEntity: rel.otherEntityId,
+        toEntity: keeperId,
+        type: rel.typeId,
+      });
+      mergerSpaceOps.push(...createOps);
+    }
+  }
+
+  // 4. Merger deletion → merger's space
+  mergerSpaceOps.push(...diff.mergerDeleteOps);
+
+  return { keeperSpaceOps, mergerSpaceOps };
 }

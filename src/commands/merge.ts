@@ -17,7 +17,7 @@ import * as path from 'path';
 import { parseMergeTemplate } from '../parsers/merge-parser.js';
 import { fetchEntityDetails, fetchEntityNamesByIds } from '../api/geo-client.js';
 import type { EntityDetails } from '../api/geo-client.js';
-import { computeMergePairDiff, buildMergeOps } from '../processors/merge-diff.js';
+import { computeMergePairDiff, buildMergeOps, buildCrossSpaceMergeOps } from '../processors/merge-diff.js';
 import { resolveNetwork, confirmAction } from '../utils/cli-helpers.js';
 import {
   generateMergeReport,
@@ -27,7 +27,7 @@ import {
 import { saveOperationReport } from '../publishers/report.js';
 import { validatePrivateKey, publishToGeo } from '../publishers/publisher.js';
 import { logger, setVerbose } from '../utils/logger.js';
-import type { MergeOptions, MergePairDiff, MergeSummary } from '../config/merge-types.js';
+import type { MergeOptions, MergePairDiff, MergeSummary, CrossSpaceStrategy } from '../config/merge-types.js';
 import type { Metadata, PublishOptions } from '../config/types.js';
 import type { OperationsBatch, BatchSummary } from '../config/upsert-types.js';
 
@@ -108,11 +108,45 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
     logger.success(`Parsed ${pairs.length} merge pair(s) from template`);
     logger.keyValue('Space', spaceId);
 
+    // Resolve effective space IDs per pair and detect cross-space pairs
+    const crossSpaceStrategy = options.crossSpace as CrossSpaceStrategy | undefined;
+    const effectiveSpaceIds = pairs.map(pair => ({
+      keeperSpaceId: pair.keeperSpaceId ?? spaceId,
+      mergerSpaceId: pair.mergerSpaceId ?? spaceId,
+    }));
+    const crossSpacePairIndices = effectiveSpaceIds
+      .map((ids, i) => ids.keeperSpaceId !== ids.mergerSpaceId ? i : -1)
+      .filter(i => i >= 0);
+    const hasCrossSpacePairs = crossSpacePairIndices.length > 0;
+
+    // Validate cross-space flag vs template content
+    if (hasCrossSpacePairs && !crossSpaceStrategy) {
+      logger.error(
+        `Found ${crossSpacePairIndices.length} cross-space pair(s) but --cross-space flag not provided.`
+      );
+      logger.info('Use --cross-space migrate or --cross-space link');
+      process.exit(1);
+    }
+    if (crossSpaceStrategy && !hasCrossSpacePairs) {
+      logger.warn('--cross-space flag provided but all pairs are same-space. Flag will be ignored.');
+    }
+    if (crossSpaceStrategy && crossSpaceStrategy !== 'migrate' && crossSpaceStrategy !== 'link') {
+      logger.error(`Invalid --cross-space strategy: "${crossSpaceStrategy}". Must be "migrate" or "link".`);
+      process.exit(1);
+    }
+
+    if (hasCrossSpacePairs) {
+      logger.keyValue('Cross-space strategy', crossSpaceStrategy!);
+      logger.keyValue('Cross-space pairs', crossSpacePairIndices.length.toString());
+    }
+
     // Log pair details
-    for (const pair of pairs) {
+    for (let pi = 0; pi < pairs.length; pi++) {
+      const pair = pairs[pi];
       const keeperLabel = pair.keeperName ? `${pair.keeperName} (${pair.keeperId})` : pair.keeperId;
       const mergerLabel = pair.mergerName ? `${pair.mergerName} (${pair.mergerId})` : pair.mergerId;
-      logger.info(`  ${keeperLabel} <- ${mergerLabel}`);
+      const crossLabel = crossSpacePairIndices.includes(pi) ? ' [cross-space]' : '';
+      logger.info(`  ${keeperLabel} <- ${mergerLabel}${crossLabel}`);
     }
 
     // ========================================================================
@@ -123,23 +157,24 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
     const keeperDetailsMap = new Map<string, EntityDetails>();
     const mergerDetailsMap = new Map<string, EntityDetails>();
 
-    // Fetch all entity details by ID (no name resolution needed)
+    // Fetch all entity details by ID using per-pair space IDs
     for (let i = 0; i < pairs.length; i++) {
       const pair = pairs[i];
+      const { keeperSpaceId: effKeeperSpace, mergerSpaceId: effMergerSpace } = effectiveSpaceIds[i];
       const keeperLabel = pair.keeperName || pair.keeperId;
       const mergerLabel = pair.mergerName || pair.mergerId;
       logger.info(`Fetching pair ${i + 1}/${pairs.length}: ${keeperLabel} <- ${mergerLabel}`);
 
-      const keeperDetails = await fetchEntityDetails(pair.keeperId, spaceId, network);
-      const mergerDetails = await fetchEntityDetails(pair.mergerId, spaceId, network);
+      const keeperDetails = await fetchEntityDetails(pair.keeperId, effKeeperSpace, network);
+      const mergerDetails = await fetchEntityDetails(pair.mergerId, effMergerSpace, network);
 
       if (!keeperDetails) {
-        logger.error(`Keeper entity ${pair.keeperId} not found in space ${spaceId}`);
+        logger.error(`Keeper entity ${pair.keeperId} not found in space ${effKeeperSpace}`);
         process.exit(1);
       }
 
       if (!mergerDetails) {
-        logger.error(`Merger entity ${pair.mergerId} not found in space ${spaceId}`);
+        logger.error(`Merger entity ${pair.mergerId} not found in space ${effMergerSpace}`);
         process.exit(1);
       }
 
@@ -177,11 +212,18 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
 
     // Compute diffs with name resolution
     const diffs: MergePairDiff[] = [];
-    for (const pair of pairs) {
+    for (let i = 0; i < pairs.length; i++) {
+      const pair = pairs[i];
+      const { keeperSpaceId: effKeeperSpace, mergerSpaceId: effMergerSpace } = effectiveSpaceIds[i];
       const keeperDetails = keeperDetailsMap.get(pair.keeperId)!;
       const mergerDetails = mergerDetailsMap.get(pair.mergerId)!;
 
-      const diff = computeMergePairDiff(keeperDetails, mergerDetails, nameMap);
+      const isCrossSpacePair = effKeeperSpace !== effMergerSpace;
+      const diff = computeMergePairDiff(keeperDetails, mergerDetails, nameMap, {
+        crossSpaceStrategy: isCrossSpacePair ? crossSpaceStrategy : undefined,
+        keeperSpaceId: effKeeperSpace,
+        mergerSpaceId: effMergerSpace,
+      });
       diffs.push(diff);
     }
 
@@ -194,6 +236,7 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
       relationsSkipped: diffs.reduce((sum, d) => sum + d.relationsSkipped.length, 0),
       typesTransferred: diffs.reduce((sum, d) => sum + d.typesToTransfer.length, 0),
       mergersDeleted: diffs.length,
+      crossSpacePairs: diffs.filter(d => d.isCrossSpace).length,
     };
 
     // --dry-run gate: stop after diff phase
@@ -269,62 +312,138 @@ export async function mergeCommand(file: string, options: MergeOptions): Promise
     // with many merger-to-one-keeper scenarios, consider re-fetching keeper state
     // between publishes. Current approach is sufficient for typical use (tens of pairs).
 
+    // Helper to build a zeroed BatchSummary adapter
+    const zeroBatchSummary = (): BatchSummary => ({
+      typesCreated: 0,
+      typesLinked: 0,
+      propertiesCreated: 0,
+      propertiesLinked: 0,
+      entitiesCreated: 0,
+      entitiesLinked: 0,
+      relationsCreated: 0,
+      imagesUploaded: 0,
+      multiTypeEntities: [],
+    });
+
+    const resolvedSpaceType = (spaceType === 'DAO' ? 'DAO' : 'Personal') as 'Personal' | 'DAO';
+
+    const publishOptions: PublishOptions = {
+      network,
+      dryRun: false,
+      verbose: options.verbose,
+      outputDir: options.output,
+    };
+
     for (let i = 0; i < diffs.length; i++) {
       const diff = diffs[i];
-      logger.info(`Publishing pair ${i + 1}/${diffs.length}: ${diff.keeperName} <- ${diff.mergerName}`);
+      const pairLabel = `Pair ${i + 1}/${diffs.length}: ${diff.keeperName} <- ${diff.mergerName}`;
+      logger.info(`Publishing ${pairLabel}`);
 
-      // Build ops for this pair
-      const ops = buildMergeOps(diff, diff.keeperId);
+      if (diff.isCrossSpace && crossSpaceStrategy) {
+        // ---- Cross-space publish ----
+        const crossOps = buildCrossSpaceMergeOps(diff, diff.keeperId, crossSpaceStrategy);
 
-      if (ops.length === 0) {
-        logger.warn(`Pair ${i + 1}: No operations to publish (skipping).`);
-        publishResults.push({ success: true });
-        continue;
-      }
+        if (crossOps.keeperSpaceOps.length === 0 && crossOps.mergerSpaceOps.length === 0) {
+          logger.warn(`${pairLabel}: No operations to publish (skipping).`);
+          publishResults.push({ success: true });
+          continue;
+        }
 
-      // Build OperationsBatch with zeroed BatchSummary adapter
-      const batchSummary: BatchSummary = {
-        typesCreated: 0,
-        typesLinked: 0,
-        propertiesCreated: 0,
-        propertiesLinked: 0,
-        entitiesCreated: 0,
-        entitiesLinked: 0,
-        relationsCreated: 0,
-        imagesUploaded: 0,
-        multiTypeEntities: [],
-      };
+        if (crossSpaceStrategy === 'link') {
+          // Link mode: single publish to merger's space
+          logger.info(`  [link] Publishing ${crossOps.mergerSpaceOps.length} op(s) to merger space ${diff.mergerSpaceId}`);
+          const batch: OperationsBatch = { ops: crossOps.mergerSpaceOps, summary: zeroBatchSummary() };
+          const metadata: Metadata = {
+            spaceId: diff.mergerSpaceId,
+            spaceType: resolvedSpaceType,
+            author: author || undefined,
+          };
+          const result = await publishToGeo(batch, metadata, privateKey, publishOptions);
+          publishResults.push(result);
 
-      const batch: OperationsBatch = {
-        ops,
-        summary: batchSummary,
-      };
+          if (result.success) {
+            logger.success(`${pairLabel} published (link)`);
+            if (result.transactionHash) logger.keyValue('Transaction', result.transactionHash);
+          } else {
+            logger.error(`${pairLabel} publish failed: ${result.error || 'Unknown error'}`);
+          }
+        } else {
+          // Migrate mode: two sequential publishes
+          let keeperPublishOk = true;
 
-      const metadata: Metadata = {
-        spaceId,
-        spaceType: (spaceType === 'DAO' ? 'DAO' : 'Personal') as 'Personal' | 'DAO',
-        author: author || undefined,
-      };
+          // Publish 1: keeper's space (add data)
+          if (crossOps.keeperSpaceOps.length > 0) {
+            logger.info(`  [migrate] Publishing ${crossOps.keeperSpaceOps.length} op(s) to keeper space ${diff.keeperSpaceId}`);
+            const batch: OperationsBatch = { ops: crossOps.keeperSpaceOps, summary: zeroBatchSummary() };
+            const metadata: Metadata = {
+              spaceId: diff.keeperSpaceId,
+              spaceType: resolvedSpaceType,
+              author: author || undefined,
+            };
+            const result1 = await publishToGeo(batch, metadata, privateKey, publishOptions);
 
-      const publishOptions: PublishOptions = {
-        network,
-        dryRun: false,
-        verbose: options.verbose,
-        outputDir: options.output,
-      };
+            if (result1.success) {
+              logger.success(`  Keeper space publish succeeded`);
+              if (result1.transactionHash) logger.keyValue('  Transaction', result1.transactionHash);
+            } else {
+              logger.error(`  Keeper space publish failed: ${result1.error || 'Unknown error'}`);
+              logger.warn(`  Skipping merger space cleanup for this pair.`);
+              publishResults.push(result1);
+              keeperPublishOk = false;
+            }
+          }
 
-      const result = await publishToGeo(batch, metadata, privateKey, publishOptions);
-      publishResults.push(result);
+          // Publish 2: merger's space (delete data) — only if publish 1 succeeded
+          if (keeperPublishOk && crossOps.mergerSpaceOps.length > 0) {
+            logger.info(`  [migrate] Publishing ${crossOps.mergerSpaceOps.length} op(s) to merger space ${diff.mergerSpaceId}`);
+            const batch: OperationsBatch = { ops: crossOps.mergerSpaceOps, summary: zeroBatchSummary() };
+            const metadata: Metadata = {
+              spaceId: diff.mergerSpaceId,
+              spaceType: resolvedSpaceType,
+              author: author || undefined,
+            };
+            const result2 = await publishToGeo(batch, metadata, privateKey, publishOptions);
 
-      if (result.success) {
-        logger.success(`Pair ${i + 1} published successfully`);
-        if (result.transactionHash) {
-          logger.keyValue('Transaction', result.transactionHash);
+            if (result2.success) {
+              logger.success(`${pairLabel} published (migrate)`);
+              if (result2.transactionHash) logger.keyValue('  Transaction', result2.transactionHash);
+              publishResults.push(result2);
+            } else {
+              logger.error(`  Merger space publish failed: ${result2.error || 'Unknown error'}`);
+              logger.warn(`  Data was added to keeper's space but merger NOT deleted. Manual cleanup needed.`);
+              publishResults.push(result2);
+            }
+          } else if (keeperPublishOk && crossOps.mergerSpaceOps.length === 0) {
+            // Nothing to do in merger space
+            publishResults.push({ success: true });
+          }
         }
       } else {
-        // Log error but continue to next pair -- pairs already published
-        // are already committed on-chain
-        logger.error(`Pair ${i + 1} publish failed: ${result.error || 'Unknown error'}`);
+        // ---- Same-space publish (original logic) ----
+        const ops = buildMergeOps(diff, diff.keeperId);
+
+        if (ops.length === 0) {
+          logger.warn(`${pairLabel}: No operations to publish (skipping).`);
+          publishResults.push({ success: true });
+          continue;
+        }
+
+        const batch: OperationsBatch = { ops, summary: zeroBatchSummary() };
+        const metadata: Metadata = {
+          spaceId,
+          spaceType: resolvedSpaceType,
+          author: author || undefined,
+        };
+
+        const result = await publishToGeo(batch, metadata, privateKey, publishOptions);
+        publishResults.push(result);
+
+        if (result.success) {
+          logger.success(`${pairLabel} published successfully`);
+          if (result.transactionHash) logger.keyValue('Transaction', result.transactionHash);
+        } else {
+          logger.error(`${pairLabel} publish failed: ${result.error || 'Unknown error'}`);
+        }
       }
     }
 

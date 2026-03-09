@@ -118,7 +118,7 @@ function parseMetadataTab(
  * Parse Merge tab for keeper/merger entity ID pairs.
  *
  * Required columns: "Keeper ID", "Merger ID"
- * Optional columns: "Keeper" (name), "Merger" (name)
+ * Optional columns: "Keeper" (name), "Merger" (name), "Keeper Space ID", "Merger Space ID"
  *
  * Blank rows (all columns empty) are skipped silently.
  */
@@ -143,6 +143,8 @@ function parseMergeTab(
     const mergerId = getStringValue(row, 'Merger ID');
     const keeperName = getStringValue(row, 'Keeper');
     const mergerName = getStringValue(row, 'Merger');
+    const keeperSpaceId = getStringValue(row, 'Keeper Space ID');
+    const mergerSpaceId = getStringValue(row, 'Merger Space ID');
 
     // Skip completely blank rows
     if (!keeperId && !mergerId && !keeperName && !mergerName) continue;
@@ -167,9 +169,27 @@ function parseMergeTab(
       continue;
     }
 
+    // Validate: if one space ID is provided, both must be
+    if ((keeperSpaceId && !mergerSpaceId) || (!keeperSpaceId && mergerSpaceId)) {
+      errors.push(`Row ${rowNumber}: Both "Keeper Space ID" and "Merger Space ID" must be provided (got only one)`);
+      continue;
+    }
+
+    // Validate space ID format if provided
+    if (keeperSpaceId && !isValidEntityId(keeperSpaceId)) {
+      errors.push(`Row ${rowNumber}: Invalid Keeper Space ID format "${keeperSpaceId}" (expected 32-char hex)`);
+      continue;
+    }
+    if (mergerSpaceId && !isValidEntityId(mergerSpaceId)) {
+      errors.push(`Row ${rowNumber}: Invalid Merger Space ID format "${mergerSpaceId}" (expected 32-char hex)`);
+      continue;
+    }
+
     // Normalize IDs (strip 0x prefix if present for consistency)
     const normalizedKeeperId = keeperId.replace(/^0x/i, '');
     const normalizedMergerId = mergerId.replace(/^0x/i, '');
+    const normalizedKeeperSpaceId = keeperSpaceId?.replace(/^0x/i, '');
+    const normalizedMergerSpaceId = mergerSpaceId?.replace(/^0x/i, '');
 
     // Validate: keeper and merger cannot be the same entity
     if (normalizedKeeperId.toLowerCase() === normalizedMergerId.toLowerCase()) {
@@ -182,6 +202,8 @@ function parseMergeTab(
       mergerId: normalizedMergerId,
       keeperName: keeperName || undefined,
       mergerName: mergerName || undefined,
+      keeperSpaceId: normalizedKeeperSpaceId || undefined,
+      mergerSpaceId: normalizedMergerSpaceId || undefined,
       rowNumber,
     });
   }

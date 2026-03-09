@@ -37,12 +37,16 @@ export function generateMergeReport(
       conflictsSkipped: summary.conflictsDetected,
       mergersDeleted: summary.mergersDeleted,
     },
+    crossSpacePairs: summary.crossSpacePairs,
     details: {
       pairs: diffs.map(d => ({
         keeperName: d.keeperName,
         keeperId: d.keeperId,
+        keeperSpaceId: d.isCrossSpace ? d.keeperSpaceId : undefined,
         mergerName: d.mergerName,
         mergerId: d.mergerId,
+        mergerSpaceId: d.isCrossSpace ? d.mergerSpaceId : undefined,
+        isCrossSpace: d.isCrossSpace,
         propertiesTransferred: d.propertiesToTransfer.length,
         relationsRepointed: d.relationsToRepoint.length,
         conflicts: d.conflicts.length,
@@ -63,9 +67,17 @@ export function printMergeDiffOutput(
   options: { verbose: boolean }
 ): void {
   for (const diff of diffs) {
-    // Pair header
+    // Pair header — show space IDs for cross-space pairs
     console.log();
-    console.log(`  ${chalk.yellow('[MERGE]')} ${chalk.bold(diff.keeperName)} ${chalk.gray('<-')} ${chalk.bold(diff.mergerName)}`);
+    if (diff.isCrossSpace) {
+      const keeperSpace = diff.keeperSpaceId.slice(0, 8);
+      const mergerSpace = diff.mergerSpaceId.slice(0, 8);
+      console.log(
+        `  ${chalk.yellow('[MERGE]')} ${chalk.bold(diff.keeperName)} ${chalk.gray(`(${keeperSpace}…)`)} ${chalk.gray('<-')} ${chalk.bold(diff.mergerName)} ${chalk.gray(`(${mergerSpace}…)`)} ${chalk.cyan('[cross-space]')}`
+      );
+    } else {
+      console.log(`  ${chalk.yellow('[MERGE]')} ${chalk.bold(diff.keeperName)} ${chalk.gray('<-')} ${chalk.bold(diff.mergerName)}`);
+    }
 
     // Properties to transfer
     for (const prop of diff.propertiesToTransfer) {
@@ -119,6 +131,9 @@ export function printMergeDiffOutput(
   logger.keyValue('Relations skipped (dupes)', summary.relationsSkipped);
   logger.keyValue('Types to transfer', summary.typesTransferred);
   logger.keyValue('Mergers to delete', summary.mergersDeleted);
+  if (summary.crossSpacePairs > 0) {
+    logger.keyValue('Cross-space pairs', summary.crossSpacePairs);
+  }
 }
 
 /**

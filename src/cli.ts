@@ -112,6 +112,7 @@ const mergeCmd = program
   .option('-o, --output <dir>', 'Output directory for reports', './reports')
   .option('-v, --verbose', 'Show skipped relations and additional detail', false)
   .option('-y, --yes', 'Skip confirmation prompt', false)
+  .option('--cross-space <strategy>', 'Cross-space merge strategy: migrate or link')
   .action(async (file?: string) => {
     if (!file) {
       mergeCmd.help();
@@ -124,6 +125,7 @@ const mergeCmd = program
       output: mergeCmd.opts().output,
       verbose: mergeCmd.opts().verbose,
       yes: mergeCmd.opts().yes,
+      crossSpace: mergeCmd.opts().crossSpace,
     });
   });
 

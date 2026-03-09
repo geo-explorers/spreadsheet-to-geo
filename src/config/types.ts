@@ -170,6 +170,8 @@ export interface UpdateReport extends ReportBase {
  */
 export interface MergeReport extends ReportBase {
   operationType: 'merge';
+  crossSpacePairs?: number;
+  crossSpaceStrategy?: string;
   summary: {
     pairsMerged: number;
     propertiesTransferred: number;
@@ -181,8 +183,11 @@ export interface MergeReport extends ReportBase {
     pairs: Array<{
       keeperName: string;
       keeperId: string;
+      keeperSpaceId?: string;
       mergerName: string;
       mergerId: string;
+      mergerSpaceId?: string;
+      isCrossSpace?: boolean;
       propertiesTransferred: number;
       relationsRepointed: number;
       conflicts: number;

@@ -12,6 +12,13 @@
 import type { Op, TypedValue } from '@geoprotocol/geo-sdk';
 
 // ============================================================================
+// Cross-Space Strategy
+// ============================================================================
+
+/** Strategy for cross-space merges */
+export type CrossSpaceStrategy = 'migrate' | 'link';
+
+// ============================================================================
 // CLI Options
 // ============================================================================
 
@@ -22,6 +29,7 @@ export interface MergeOptions {
   output: string;      // Report output directory
   verbose: boolean;
   yes: boolean;        // Skip confirmation prompt
+  crossSpace?: CrossSpaceStrategy;  // Cross-space merge strategy
 }
 
 // ============================================================================
@@ -34,6 +42,8 @@ export interface MergePair {
   mergerId: string;      // Merger entity ID (required)
   keeperName?: string;   // Optional keeper name (for readability/cross-validation)
   mergerName?: string;   // Optional merger name (for readability/cross-validation)
+  keeperSpaceId?: string;  // Optional per-pair space ID (cross-space merge)
+  mergerSpaceId?: string;  // Optional per-pair space ID (cross-space merge)
   rowNumber: number;     // 1-based row number for error reporting
 }
 
@@ -53,8 +63,11 @@ export interface MergeConflict {
 export interface MergePairDiff {
   keeperName: string;
   keeperId: string;
+  keeperSpaceId: string;
   mergerName: string;
   mergerId: string;
+  mergerSpaceId: string;
+  isCrossSpace: boolean;
 
   /** Unique properties to copy from merger to keeper */
   propertiesToTransfer: Array<{
@@ -106,5 +119,16 @@ export interface MergeSummary {
   relationsSkipped: number;
   typesTransferred: number;
   mergersDeleted: number;
+  crossSpacePairs: number;
+}
+
+// ============================================================================
+// Cross-Space Ops
+// ============================================================================
+
+/** Split ops for cross-space merge (separate publish per space) */
+export interface CrossSpaceOps {
+  keeperSpaceOps: Op[];   // Ops to publish to keeper's space
+  mergerSpaceOps: Op[];   // Ops to publish to merger's space
 }
 
